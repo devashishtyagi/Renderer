@@ -1,0 +1,257 @@
+//
+//  def.cpp
+//  MinorProject
+//  use clang++ -std=c++11 -stdlib=libc++ def.cpp to compile on terminal
+//  Created by Keshav Choudhary on 20/02/13.
+//  Copyright (c) 2013 Keshav Choudhary. All rights reserved.
+//
+
+#include "def.h"
+#include <unordered_map>
+#include <cstdio>
+#include <cstdlib>
+#include <iostream>
+#include <fstream>
+#include <sstream>
+#include <vector>
+#include <string>
+#include <algorithm>
+
+using namespace std;
+
+unsigned long long universalTid;
+
+void InitializeData::readImage(const char *fileName) {
+    ifstream myfile (fileName);
+    myfile>>imx>>imy;
+    imcolor.resize(imx);
+    for(int i = 0; i < imx; i++) {
+        imcolor[i].resize(imy);
+        for(int j = 0; j < imy; j++) {
+            for(int k = 0; k < 3; k++) {
+                myfile>>imcolor[i][j][k];
+            }
+        }
+    }
+}
+
+void InitializeData::readWeatherMap(const char *fileName) {
+    ifstream myfile (fileName);
+    myfile>>wmx>>wmy;
+    wdegree.resize(wmx);
+    for(int i = 0; i < wmx; i++) {
+        wdegree[i].resize(wmy);
+        for(int j = 0; j < wmy; j++) {
+            myfile>>wdegree[i][j];
+        }
+    }
+}
+
+void InitializeData::readPoints(const char* fileName) {
+    ifstream myfile (fileName);
+    vector<float> points(3);
+    string data;
+    if (myfile.is_open()) {
+        int index = 0;
+        while (myfile.good()) {
+            getline (myfile, data);
+            if (index >= 1 && index <= 8)
+            {
+                unordered_map<string,vertex>::const_iterator got =map.find (data);
+                if ( got == map.end() ) // new vertex
+                {
+                    stringstream ss(data);
+                    ss>>points[0]>>points[1]>>points[2];
+                    vertex m(points[0],points[1],points[2]);
+                    map[data] = m;
+                }
+            }
+
+            index = (index+1)%10;
+        }
+
+    }
+}
+
+void InitializeData::split(string data, vector<string> points) {
+    stringstream ss(data);
+    ss>>points[0]>>points[1]>>points[2];
+}
+
+void InitializeData::triPush(string p1, string p2, string p3, pair<int,float> vd, bool visible) {
+
+    unordered_map<string,vertex>::iterator point1 =map.find (p1);
+
+    if(point1 == map.end())
+        cout<<"Error :  Vertex 1 not found"<<endl;
+
+    if(point1->second.curIndex >= 36)
+        cout<<"Vertex allready in 36 traingles"<<endl;
+    else {
+        point1->second.neighbours[point1->second.curIndex] = universalTid;
+        point1->second.curIndex++;
+    }
+
+
+    unordered_map<string,vertex>::iterator point2 =map.find (p2);
+
+    if(point2 == map.end())
+        cout<<"Error :  Vertex 2 not found"<<endl;
+
+    if(point2->second.curIndex >= 36)
+        cout<<"Vertex allready in 36 traingles"<<endl;
+    else {
+        point2->second.neighbours[point2->second.curIndex] = universalTid;
+        point2->second.curIndex++;
+    }
+
+    unordered_map<string,vertex>::iterator point3 =map.find (p3);
+
+    if(point3 == map.end())
+        cout<<"Error :  Vertex 3 not found"<<endl;
+
+    if(point3->second.curIndex >= 36)
+        cout<<"Vertex allready in 36 traingles"<<endl;
+    else {
+        point3->second.neighbours[point3->second.curIndex] = universalTid;
+        point3->second.curIndex++;
+    }
+
+
+    triangle t(&(point1->second),&(point2->second),&(point3->second),universalTid,vd.first,-vd.second,visible);
+
+    Triangles.push_back(t);
+    universalTid++;
+}
+
+// impart color to all the vertices depeding on their neighbourhood
+void InitializeData::impartColor()
+{
+    // we can run through all vertices use the neighbourhood information and impart them a color using the corrosion values of the neighbours
+
+    for ( auto it = map.begin(); it != map.end(); ++it )
+    {
+        vertex q = it->second;
+        float sum = 0.0f;
+        int count = 0;
+        for (int i = 0; i < 36 ; i++ )
+        {
+            if(q.neighbours[i] != -1)
+            {
+                sum +=	 Triangles[q.neighbours[i]].corrosionLevel;
+                count++;
+            }
+
+        }
+        float val = sum / (1.0f * count);
+
+        it->second.avgCorrosionLevel = val;
+        float color = 1.0f - (1.0f-0.62f)*val;
+        /*
+        float color;
+        if (val >= 0.5)
+            color = 1.0f;
+        else
+            color = 0.0f;
+        */
+        it->second.r = color;
+        it->second.g = color;
+        it->second.b = color;
+    }
+}
+
+
+
+void InitializeData::formTriangles(const char* fileName)
+{
+    ifstream myfile (fileName);
+
+    pair<int,float> voxelDetails;
+    vector<string> cube(8);
+    string data;
+
+    if (myfile.is_open()) {
+        int index = 0;
+        while (myfile.good()) {
+            getline (myfile, data);
+
+            if(index == 0 ) {
+                stringstream ss(data);
+                int a;
+                float b;
+                ss>>a>>b;
+                voxelDetails = make_pair(a,b); // would be used in each of the 12 traingles
+            }
+            else if (index >= 1 && index <= 8)
+                cube[index-1] = data;
+            else if (index == 9){
+
+                stringstream ss(data);
+                string a[6];
+                int b[6],c[6];
+                ss>>a[0]>>b[0]>>c[0]>>a[1]>>b[1]>>c[1]>>a[2]>>b[2]>>c[2]>>a[3]>>b[3]>>c[3]>>a[4]>>b[4]>>c[4]>>a[5]>>b[5]>>c[5];
+
+                //front face -- 0
+                bool visible = false;
+                if(b[0] == -1)
+                    visible = true;
+
+                triPush(cube[0], cube[1], cube[2],voxelDetails,visible);
+                triPush(cube[0], cube[2], cube[3],voxelDetails,visible);
+
+                //right face -- 1
+                visible = false;
+                if(b[1] == -1)
+                    visible = true;
+
+                triPush(cube[4], cube[0], cube[7],voxelDetails,visible);
+                triPush(cube[4], cube[3], cube[7],voxelDetails,visible);
+
+                //back face -- 2
+                visible = false;
+                if(b[2] == -1)
+                    visible = true;
+
+                triPush(cube[4], cube[5], cube[7],voxelDetails,visible);
+                triPush(cube[5], cube[7], cube[6],voxelDetails,visible);
+
+                //left face -- 3
+                visible = false;
+                if(b[3] == -1)
+                    visible = true;
+
+                triPush(cube[1], cube[5], cube[6],voxelDetails,visible);
+                triPush(cube[1], cube[6], cube[2],voxelDetails,visible);
+
+                // top face -- 4
+                visible = false;
+                if(b[4] == -1)
+                    visible = true;
+
+                triPush(cube[4], cube[5], cube[1],voxelDetails,visible);
+                triPush(cube[4], cube[1], cube[0],voxelDetails,visible);
+
+                //bottom face -- 5
+                visible = false;
+                if(b[5] == -1)
+                    visible = true;
+
+                triPush(cube[3], cube[2], cube[6],voxelDetails,visible);
+                triPush(cube[3], cube[6], cube[7],voxelDetails,visible);
+            }
+            index = (index+1)%10;
+        }
+    }
+}
+
+
+
+void InitializeData::initializeData()
+{
+    universalTid = 0;
+    readPoints("Data/voxels3.txt");
+    cout<<"Reading done"<<endl;
+    formTriangles("Data/voxels3.txt");
+    cout<<"Traingles Formed"<<endl;
+    impartColor();
+}
