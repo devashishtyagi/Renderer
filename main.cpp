@@ -148,7 +148,16 @@ void _update_fps_counter () {
 }
 
 // Callback function to handle resize event
-void resize(int width, int height) {
+/* Callback function section */
+void GLFWCALL resize(int width, int height) {
+    float near = 0.1f; // clipping plane
+    float far = 100.0f; // clipping plane
+    float fov = 45.0f;
+    float aspect = (float)width / (float)height; // aspect ratio
+
+    proj_mat = glm::perspective(fov, aspect, near, far);
+
+    glViewport(0, 0, width, height);
 }
 
 int main() {
@@ -167,6 +176,8 @@ int main() {
         shutDown(2);
     // start GLEW extension handler
     glewInit();
+    // register for resize callback
+    glfwSetWindowSizeCallback(resize);
 
     // get version info
     const GLubyte* renderer = glGetString (GL_RENDERER); // get renderer string

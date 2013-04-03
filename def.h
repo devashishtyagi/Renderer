@@ -73,6 +73,8 @@ class InitializeData
     {
 private:
         double runningAlpha;
+        std::vector< std::vector< std::vector<int> > > imageStore;
+        std::vector< std::vector<double> > weatherDegree;
         std::map< double, std::pair< int, std::pair<int,int> > > colormap;
         void buildMap(const char* imageFile, const char* weatherMapFile);
         void readPoints(const char* fileName);

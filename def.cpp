@@ -23,21 +23,41 @@ unsigned long long universalTid;
 
 void InitializeData::buildMap(const char *imageFile, const char *weatherMapFile) {
     ifstream imfile(imageFile), wmfile(weatherMapFile);
-    int imx, imy, wmx, wmy;
-    imfile>>imx>>imy;
+    int imx, imy, wmx, wmy, z;
+    imfile>>imx>>imy>>z;
     wmfile>>wmx>>wmy;
     assert(imx == wmx && imy == wmy);
+
+    imageStore.resize(imx);
     for(int i = 0; i < imx; i++) {
+        imageStore[i].resize(imy);
         for(int j = 0; j < imy; j++) {
-            int c[3];
-            double wd;
-            wmfile>>wd;
-            for(int k = 0; k < 3; k++) {
-                imfile>>c[k];
-            }
-            colormap[wd] = make_pair(c[0], make_pair(c[1], c[2]));
+            imageStore[i][j].resize(z);
         }
     }
+
+    weatherDegree.resize(wmx);
+    for(int i = 0; i < wmx; i++) {
+        weatherDegree[i].resize(wmy);
+    }
+
+    for(int k = 0; k < z; k++) {
+        for(int i = 0; i < imx; i++) {
+            for(int j = 0; j < imy; j++)
+                imfile>>imageStore[i][j][k];
+        }
+    }
+
+    for(int i = 0; i < wmx; i++) {
+        for(int j = 0; j < wmy; j++)
+            wmfile>>weatherDegree[i][j];
+    }
+
+    for(int i = 0; i < imx; i++) {
+        for(int j = 0; j < imy; j++)
+            colormap[weatherDegree[i][j]] = make_pair(imageStore[i][j][0], make_pair(imageStore[i][j][1], imageStore[i][j][2]));
+    }
+
     imfile.close();
     wmfile.close();
 }
@@ -52,7 +72,7 @@ void InitializeData::readPoints(const char* fileName) {
             getline (myfile, data);
             if (index >= 1 && index <= 8)
             {
-                unordered_map<string,vertex>::const_iterator got =map.find (data);
+                unordered_map<string,vertex>::const_iterator got = map.find (data);
                 if ( got == map.end() ) // new vertex
                 {
                     stringstream ss(data);
@@ -155,6 +175,7 @@ void InitializeData::impartColor()
 
         it->second.avgCorrosionLevel = val;
         auto low = findClose(colormap, val);
+
         /*
         float color = 1.0f - (1.0f-0.62f)*val;
         float color;
@@ -163,9 +184,14 @@ void InitializeData::impartColor()
         else
             color = 0.0f;
         */
+
         it->second.r = (double)low->second.first/255.0;
         it->second.g = (double)low->second.second.first/255.0;
         it->second.b = (double)low->second.second.second/255.0;
+
+//        it->second.r = val;
+//        it->second.g = val;
+//        it->second.b = 1.0 - val;
     }
 }
 
