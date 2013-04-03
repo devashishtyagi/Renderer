@@ -7,9 +7,9 @@
 //
 
 #include "def.h"
-#include <unordered_map>
 #include <cstdio>
 #include <cstdlib>
+#include <cassert>
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -21,30 +21,25 @@ using namespace std;
 
 unsigned long long universalTid;
 
-void InitializeData::readImage(const char *fileName) {
-    ifstream myfile (fileName);
-    myfile>>imx>>imy;
-    imcolor.resize(imx);
+void InitializeData::buildMap(const char *imageFile, const char *weatherMapFile) {
+    ifstream imfile(imageFile), wmfile(weatherMapFile);
+    int imx, imy, wmx, wmy;
+    imfile>>imx>>imy;
+    wmfile>>wmx>>wmy;
+    assert(imx == wmx && imy == wmy);
     for(int i = 0; i < imx; i++) {
-        imcolor[i].resize(imy);
         for(int j = 0; j < imy; j++) {
+            int c[3];
+            double wd;
+            wmfile>>wd;
             for(int k = 0; k < 3; k++) {
-                myfile>>imcolor[i][j][k];
+                imfile>>c[k];
             }
+            colormap[wd] = make_pair(c[0], make_pair(c[1], c[2]));
         }
     }
-}
-
-void InitializeData::readWeatherMap(const char *fileName) {
-    ifstream myfile (fileName);
-    myfile>>wmx>>wmy;
-    wdegree.resize(wmx);
-    for(int i = 0; i < wmx; i++) {
-        wdegree[i].resize(wmy);
-        for(int j = 0; j < wmy; j++) {
-            myfile>>wdegree[i][j];
-        }
-    }
+    imfile.close();
+    wmfile.close();
 }
 
 void InitializeData::readPoints(const char* fileName) {
@@ -124,6 +119,19 @@ void InitializeData::triPush(string p1, string p2, string p3, pair<int,float> vd
     universalTid++;
 }
 
+map< double, pair< int, pair<int,int> > >::const_iterator findClose(map< double, pair< int, pair<int,int> > > mymap, double value) {
+    auto last = mymap.begin();
+    for(auto it = mymap.begin(); it != mymap.end(); it++) {
+        if (it->first > value) {
+            break;
+        }
+        else {
+            last = it;
+        }
+    }
+    return last;
+}
+
 // impart color to all the vertices depeding on their neighbourhood
 void InitializeData::impartColor()
 {
@@ -146,17 +154,18 @@ void InitializeData::impartColor()
         float val = sum / (1.0f * count);
 
         it->second.avgCorrosionLevel = val;
-        float color = 1.0f - (1.0f-0.62f)*val;
+        auto low = findClose(colormap, val);
         /*
+        float color = 1.0f - (1.0f-0.62f)*val;
         float color;
         if (val >= 0.5)
             color = 1.0f;
         else
             color = 0.0f;
         */
-        it->second.r = color;
-        it->second.g = color;
-        it->second.b = color;
+        it->second.r = (double)low->second.first/255.0;
+        it->second.g = (double)low->second.second.first/255.0;
+        it->second.b = (double)low->second.second.second/255.0;
     }
 }
 
@@ -249,9 +258,12 @@ void InitializeData::formTriangles(const char* fileName)
 void InitializeData::initializeData()
 {
     universalTid = 0;
+    runningAlpha = 0.8;
     readPoints("Data/voxels3.txt");
     cout<<"Reading done"<<endl;
     formTriangles("Data/voxels3.txt");
     cout<<"Traingles Formed"<<endl;
+    buildMap("Data/image.dat", "Data/weather.dat");
+    cout<<"Weather Map read"<<endl;
     impartColor();
 }

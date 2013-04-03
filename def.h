@@ -3,6 +3,8 @@
 #endif // DEF_H
 
 #include <unordered_map>
+#include <map>
+#include <utility>
 #include <vector>
 #include <cstring>
 #include <string>
@@ -70,12 +72,9 @@ typedef struct Triangle triangle;
 class InitializeData
     {
 private:
-    int imx, imy;
-    int wmx, wmy;
-    vector< vector<int> > imcolor[3];
-    vector< vector<int> > wdegree;
-    void readImage(const char* fileName);
-    void readWeatherMap(const char* fileName);
+        double runningAlpha;
+        std::map< double, std::pair< int, std::pair<int,int> > > colormap;
+        void buildMap(const char* imageFile, const char* weatherMapFile);
         void readPoints(const char* fileName);
         void split(std::string data, std::vector<std::string> points);
         void triPush(std::string p1, std::string p2, std::string p3, std::pair<int,float> vd, bool visible);
