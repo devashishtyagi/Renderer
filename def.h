@@ -76,12 +76,14 @@ private:
         std::vector< std::vector< std::vector<int> > > imageStore;
         std::vector< std::vector<double> > weatherDegree;
         std::map< double, std::pair< int, std::pair<int,int> > > colormap;
+		std::vector< std::pair<int,double> > boundaryVoxelList;
         void buildMap(const char* imageFile, const char* weatherMapFile);
         void readPoints(const char* fileName);
         void split(std::string data, std::vector<std::string> points);
         void triPush(std::string p1, std::string p2, std::string p3, std::pair<int,float> vd, bool visible);
         void impartColor();
         void formTriangles(const char* fileName);
+		void populateBoundaryVoxels (const char* fileName);
     public:
         void initializeData();
         std::unordered_map<std::string,vertex> map;
