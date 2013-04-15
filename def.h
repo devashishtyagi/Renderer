@@ -76,7 +76,7 @@ private:
         std::vector< std::vector< std::vector<int> > > imageStore;
         std::vector< std::vector<double> > weatherDegree;
         std::map< double, std::pair< int, std::pair<int,int> > > colormap;
-		std::vector< std::pair<int,double> > boundaryVoxelList;
+        std::vector<int> boundaryVoxelList;
         void buildMap(const char* imageFile, const char* weatherMapFile);
         void readPoints(const char* fileName);
         void split(std::string data, std::vector<std::string> points);

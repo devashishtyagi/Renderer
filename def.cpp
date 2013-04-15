@@ -75,11 +75,8 @@ void InitializeData::populateBoundaryVoxels (const char* fileName) {
             
 			getline (myfile, data);
             if (index == 0) {
-				
 				stringstream ss(data);
 				ss>>voxelID>>weathingD;
-
-				
             }
 			else if (index == 9) {
 				
@@ -93,34 +90,28 @@ void InitializeData::populateBoundaryVoxels (const char* fileName) {
                 if(b[0] == -1)
                     visible = true;
 								
-                //right face -- 1
-                visible = false;
+                // right face -- 1
                 if(b[1] == -1)
                     visible = true;
 				
                 //back face -- 2
-                visible = false;
                 if(b[2] == -1)
                     visible = true;
 				
                 //left face -- 3
-                visible = false;
                 if(b[3] == -1)
                     visible = true;
 				
                 // top face -- 4
-                visible = false;
                 if(b[4] == -1)
                     visible = true;
 				
                 //bottom face -- 5
-                visible = false;
                 if(b[5] == -1)
                     visible = true;
 				
 				if(visible)
-					boundaryVoxelList.push_back(make_pair(voxelID,weathingD));
-				
+                    boundaryVoxelList.push_back(voxelID);
 			}
 			
             index = (index+1)%10;
@@ -136,22 +127,20 @@ void InitializeData::readPoints(const char* fileName) {
     ifstream myfile (fileName);
     vector<float> points(3);
     string data;
-	bool insert = true;
 	int voxelID;
 	double weathingD;
 
     if (myfile.is_open()) {
         int index = 0;
+        bool insert = true;
         while (myfile.good()) {
             getline (myfile, data);
 			if(index == 0) {
-				insert = true;
+                insert = true;
 				stringstream ss(data);
 				ss>>voxelID>>weathingD;
-				vector<pair<int,double> >::const_iterator it = find(boundaryVoxelList.begin(),boundaryVoxelList.end(), make_pair(voxelID,weathingD));
-				if (it == boundaryVoxelList.end()) {
-					insert = false;
-				}
+                if (find(boundaryVoxelList.begin(),boundaryVoxelList.end(), voxelID) == boundaryVoxelList.end())
+                    insert = false;
 			}
 				
             if (index >= 1 && index <= 8 && insert)
@@ -179,7 +168,7 @@ void InitializeData::split(string data, vector<string> points) {
 
 void InitializeData::triPush(string p1, string p2, string p3, pair<int,float> vd, bool visible) {
 
-    unordered_map<string,vertex>::iterator point1 =map.find (p1);
+    unordered_map<string,vertex>::iterator point1 = map.find (p1);
 
     if(point1 == map.end())
         cout<<"Error :  Vertex 1 not found"<<endl;
@@ -229,12 +218,10 @@ void InitializeData::formTriangles(const char* fileName)
 {
     ifstream myfile (fileName);
 
-    pair<int,float> voxelDetails;
+    pair<int,double> voxelDetails;
     vector<string> cube(8);
     string data;
 	bool insert = true;
-	int voxelID;
-	double weathingD;
 
     if (myfile.is_open()) {
         int index = 0;
@@ -243,16 +230,13 @@ void InitializeData::formTriangles(const char* fileName)
 
             if(index == 0 ) {
                 stringstream ss(data);
-                int a;
-                float b;
-                ss>>a>>b;
+                int voxelID;
+                double weathingD;
+                ss>>voxelID>>weathingD;
 				insert = true;
-                voxelDetails = make_pair(a,b); // would be used in each of the 12 traingles
-				vector<pair<int,double> >::const_iterator it = find(boundaryVoxelList.begin(),boundaryVoxelList.end(), make_pair(voxelID,weathingD));
-
-				if (it == boundaryVoxelList.end()) {
-					insert = false;
-				}
+                voxelDetails = make_pair(voxelID,weathingD); // would be used in each of the 12 traingles
+                if (find(boundaryVoxelList.begin(),boundaryVoxelList.end(), voxelID) == boundaryVoxelList.end() )
+                    insert = false;
 
             }
             else if (index >= 1 && index <= 8 )
@@ -379,11 +363,11 @@ void InitializeData::initializeData()
 {
     universalTid = 0;
     runningAlpha = 0.8;
-	populateBoundaryVoxels("Data/voxels3.txt");
+    populateBoundaryVoxels("Data/voxels6.txt");
 	cout<<"Voxels Selected "<<boundaryVoxelList.size()<<endl;
-    readPoints("Data/voxels3.txt");
+    readPoints("Data/voxels6.txt");
     cout<<"Reading done"<<map.size()<<endl;
-    formTriangles("Data/voxels3.txt");
+    formTriangles("Data/voxels6.txt");
     cout<<"Traingles Formed"<<endl;
     buildMap("Data/image.dat", "Data/weather.dat");
     cout<<"Weather Map read"<<endl;
