@@ -62,15 +62,99 @@ void InitializeData::buildMap(const char *imageFile, const char *weatherMapFile)
     wmfile.close();
 }
 
+//Populate the boundary Voxel List
+
+void InitializeData::populateBoundaryVoxels (const char* fileName) {
+	ifstream myfile (fileName);
+    string data;
+    if (myfile.is_open()) {
+        int index = 0;
+		int voxelID;
+		double weathingD;
+        while (myfile.good()) {
+            
+			getline (myfile, data);
+            if (index == 0) {
+				
+				stringstream ss(data);
+				ss>>voxelID>>weathingD;
+
+				
+            }
+			else if (index == 9) {
+				
+				stringstream ss(data);
+                string a[6];
+                int b[6],c[6];
+                ss>>a[0]>>b[0]>>c[0]>>a[1]>>b[1]>>c[1]>>a[2]>>b[2]>>c[2]>>a[3]>>b[3]>>c[3]>>a[4]>>b[4]>>c[4]>>a[5]>>b[5]>>c[5];
+				
+                //front face -- 0
+                bool visible = false;
+                if(b[0] == -1)
+                    visible = true;
+								
+                //right face -- 1
+                visible = false;
+                if(b[1] == -1)
+                    visible = true;
+				
+                //back face -- 2
+                visible = false;
+                if(b[2] == -1)
+                    visible = true;
+				
+                //left face -- 3
+                visible = false;
+                if(b[3] == -1)
+                    visible = true;
+				
+                // top face -- 4
+                visible = false;
+                if(b[4] == -1)
+                    visible = true;
+				
+                //bottom face -- 5
+                visible = false;
+                if(b[5] == -1)
+                    visible = true;
+				
+				if(visible)
+					boundaryVoxelList.push_back(make_pair(voxelID,weathingD));
+				
+			}
+			
+            index = (index+1)%10;
+        }
+		
+    }
+
+}
+
+// only those points which are a part of the visible voxels
+
 void InitializeData::readPoints(const char* fileName) {
     ifstream myfile (fileName);
     vector<float> points(3);
     string data;
+	bool insert = true;
+	int voxelID;
+	double weathingD;
+
     if (myfile.is_open()) {
         int index = 0;
         while (myfile.good()) {
             getline (myfile, data);
-            if (index >= 1 && index <= 8)
+			if(index == 0) {
+				insert = true;
+				stringstream ss(data);
+				ss>>voxelID>>weathingD;
+				vector<pair<int,double> >::const_iterator it = find(boundaryVoxelList.begin(),boundaryVoxelList.end(), make_pair(voxelID,weathingD));
+				if (it == boundaryVoxelList.end()) {
+					insert = false;
+				}
+			}
+				
+            if (index >= 1 && index <= 8 && insert)
             {
                 unordered_map<string,vertex>::const_iterator got = map.find (data);
                 if ( got == map.end() ) // new vertex
@@ -139,64 +223,6 @@ void InitializeData::triPush(string p1, string p2, string p3, pair<int,float> vd
     universalTid++;
 }
 
-map< double, pair< int, pair<int,int> > >::const_iterator findClose(map< double, pair< int, pair<int,int> > > mymap, double value) {
-    auto last = mymap.begin();
-    for(auto it = mymap.begin(); it != mymap.end(); it++) {
-        if (it->first > value) {
-            break;
-        }
-        else {
-            last = it;
-        }
-    }
-    return last;
-}
-
-// impart color to all the vertices depeding on their neighbourhood
-void InitializeData::impartColor()
-{
-    // we can run through all vertices use the neighbourhood information and impart them a color using the corrosion values of the neighbours
-
-    for ( auto it = map.begin(); it != map.end(); ++it )
-    {
-        vertex q = it->second;
-        float sum = 0.0f;
-        int count = 0;
-        for (int i = 0; i < 36 ; i++ )
-        {
-            if(q.neighbours[i] != -1)
-            {
-                sum +=	 Triangles[q.neighbours[i]].corrosionLevel;
-                count++;
-            }
-
-        }
-        float val = sum / (1.0f * count);
-
-        it->second.avgCorrosionLevel = val;
-//        auto low = findClose(colormap, val);
-
-
-
-        float color = 1.0f - (1.0f-0.62f)*val;
-
-//        float color;
-//        if (val >= 0.5)
-//            color = 1.0f;
-//        else
-//            color = 0.0f;
-
-
-//        it->second.r = (double)low->second.first/255.0;
-//        it->second.g = (double)low->second.second.first/255.0;
-//        it->second.b = (double)low->second.second.second/255.0;
-
-        it->second.r = val;
-        it->second.g = val;
-        it->second.b = 1.0 - val;
-    }
-}
-
 
 
 void InitializeData::formTriangles(const char* fileName)
@@ -206,6 +232,9 @@ void InitializeData::formTriangles(const char* fileName)
     pair<int,float> voxelDetails;
     vector<string> cube(8);
     string data;
+	bool insert = true;
+	int voxelID;
+	double weathingD;
 
     if (myfile.is_open()) {
         int index = 0;
@@ -217,11 +246,18 @@ void InitializeData::formTriangles(const char* fileName)
                 int a;
                 float b;
                 ss>>a>>b;
+				insert = true;
                 voxelDetails = make_pair(a,b); // would be used in each of the 12 traingles
+				vector<pair<int,double> >::const_iterator it = find(boundaryVoxelList.begin(),boundaryVoxelList.end(), make_pair(voxelID,weathingD));
+
+				if (it == boundaryVoxelList.end()) {
+					insert = false;
+				}
+
             }
-            else if (index >= 1 && index <= 8)
+            else if (index >= 1 && index <= 8 )
                 cube[index-1] = data;
-            else if (index == 9){
+            else if (index == 9 && insert){
 
                 stringstream ss(data);
                 string a[6];
@@ -281,17 +317,84 @@ void InitializeData::formTriangles(const char* fileName)
     }
 }
 
+map< double, pair< int, pair<int,int> > >::const_iterator findClose(map< double, pair< int, pair<int,int> > > mymap, double value) {
+    auto last = mymap.begin();
+    for(auto it = mymap.begin(); it != mymap.end(); it++) {
+        if (it->first > value) {
+            break;
+        }
+        else {
+            last = it;
+        }
+    }
+    return last;
+}
+
+// impart color to all the vertices depeding on their neighbourhood
+void InitializeData::impartColor()
+{
+    // we can run through all vertices use the neighbourhood information and impart them a color using the corrosion values of the neighbours
+	
+    for ( auto it = map.begin(); it != map.end(); ++it )
+    {
+        vertex q = it->second;
+        float sum = 0.0f;
+        int count = 0;
+        for (int i = 0; i < 36 ; i++ )
+        {
+            if(q.neighbours[i] != -1)
+            {
+                sum +=	 Triangles[q.neighbours[i]].corrosionLevel;
+                count++;
+            }
+			
+        }
+        float val = sum / (1.0f * count);
+		
+        it->second.avgCorrosionLevel = val;
+        //auto low = findClose(colormap, val);
+		
+        /*
+		 float color = 1.0f - (1.0f-0.62f)*val;
+		 float color;
+		 if (val >= 0.5)
+		 color = 1.0f;
+		 else
+		 color = 0.0f;
+		 */
+		
+		//        it->second.r = (double)low->second.first/255.0;
+		//        it->second.g = (double)low->second.second.first/255.0;
+		//        it->second.b = (double)low->second.second.second/255.0;
+		
+        it->second.r = val;
+        it->second.g = val;
+        it->second.b = 1.0 - val;
+    }
+}
+
 
 
 void InitializeData::initializeData()
 {
     universalTid = 0;
     runningAlpha = 0.8;
+	populateBoundaryVoxels("Data/voxels3.txt");
+	cout<<"Voxels Selected "<<boundaryVoxelList.size()<<endl;
     readPoints("Data/voxels3.txt");
-    cout<<"Reading done"<<endl;
+    cout<<"Reading done"<<map.size()<<endl;
     formTriangles("Data/voxels3.txt");
     cout<<"Traingles Formed"<<endl;
     buildMap("Data/image.dat", "Data/weather.dat");
     cout<<"Weather Map read"<<endl;
     impartColor();
 }
+
+#ifdef __APPLE__
+int main() {
+	InitializeData* node = new InitializeData();
+	node->initializeData();
+	return 0;
+}
+#endif
+
