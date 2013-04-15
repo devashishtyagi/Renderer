@@ -174,24 +174,26 @@ void InitializeData::impartColor()
         float val = sum / (1.0f * count);
 
         it->second.avgCorrosionLevel = val;
-        auto low = findClose(colormap, val);
+//        auto low = findClose(colormap, val);
 
-        /*
+
+
         float color = 1.0f - (1.0f-0.62f)*val;
-        float color;
-        if (val >= 0.5)
-            color = 1.0f;
-        else
-            color = 0.0f;
-        */
 
-        it->second.r = (double)low->second.first/255.0;
-        it->second.g = (double)low->second.second.first/255.0;
-        it->second.b = (double)low->second.second.second/255.0;
+//        float color;
+//        if (val >= 0.5)
+//            color = 1.0f;
+//        else
+//            color = 0.0f;
 
-//        it->second.r = val;
-//        it->second.g = val;
-//        it->second.b = 1.0 - val;
+
+//        it->second.r = (double)low->second.first/255.0;
+//        it->second.g = (double)low->second.second.first/255.0;
+//        it->second.b = (double)low->second.second.second/255.0;
+
+        it->second.r = val;
+        it->second.g = val;
+        it->second.b = 1.0 - val;
     }
 }
 
