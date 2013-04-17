@@ -84,6 +84,7 @@ private:
         void impartColor();
         void formTriangles(const char* fileName);
 		void populateBoundaryVoxels (const char* fileName);
+        double convertDouble(std::string str);
     public:
         void initializeData();
         std::unordered_map<std::string,vertex> map;

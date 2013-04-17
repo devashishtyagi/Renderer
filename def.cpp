@@ -21,6 +21,14 @@ using namespace std;
 
 unsigned long long universalTid;
 
+double InitializeData::convertDouble(string str) {
+    double ans;
+    stringstream sstr(str); // create a stringstream
+    sstr>>ans; // push the stream into the num
+    return ans;
+}
+
+
 void InitializeData::buildMap(const char *imageFile, const char *weatherMapFile) {
     ifstream imfile(imageFile), wmfile(weatherMapFile);
     int imx, imy, wmx, wmy, z;
@@ -231,8 +239,13 @@ void InitializeData::formTriangles(const char* fileName)
             if(index == 0 ) {
                 stringstream ss(data);
                 int voxelID;
+                string aux;
                 double weathingD;
-                ss>>voxelID>>weathingD;
+                ss>>voxelID>>aux;
+                if (aux.length() > 0)
+                    weathingD = convertDouble(aux.substr(1));
+                else
+                    weathingD = 0.0;
 				insert = true;
                 voxelDetails = make_pair(voxelID,weathingD); // would be used in each of the 12 traingles
                 if (find(boundaryVoxelList.begin(),boundaryVoxelList.end(), voxelID) == boundaryVoxelList.end() )
@@ -363,13 +376,13 @@ void InitializeData::initializeData()
 {
     universalTid = 0;
     runningAlpha = 0.8;
-    populateBoundaryVoxels("Data/voxels6.txt");
+    populateBoundaryVoxels("Data/voxels2.txt");
 	cout<<"Voxels Selected "<<boundaryVoxelList.size()<<endl;
-    readPoints("Data/voxels6.txt");
+    readPoints("Data/voxels2.txt");
     cout<<"Reading done"<<map.size()<<endl;
-    formTriangles("Data/voxels6.txt");
+    formTriangles("Data/voxels2.txt");
     cout<<"Traingles Formed"<<endl;
-    buildMap("Data/image.dat", "Data/weather.dat");
+    // buildMap("Data/image.dat", "Data/weather.dat");
     cout<<"Weather Map read"<<endl;
     impartColor();
 }

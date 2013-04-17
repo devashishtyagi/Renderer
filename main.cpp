@@ -264,7 +264,7 @@ int main() {
         glUniformMatrix4fv (view_mat_location, 1, GL_FALSE, &view_mat[0][0]);
 
         glBindVertexArray (vao);
-        glDrawArrays (GL_TRIANGLES, 0, (GLint)points.size()/3);
+        glDrawArrays (GL_LINE_STRIP, 0, (GLint)points.size()/3);
         glfwSwapBuffers();
         running = !glfwGetKey(GLFW_KEY_ESC) && glfwGetWindowParam (GLFW_OPENED);
         glBindVertexArray(0);
