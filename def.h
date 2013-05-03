@@ -9,6 +9,11 @@
 #include <cstring>
 #include <string>
 
+
+#define VOXELFILE "Data/stochastic_model_level_0000900.txt"
+#define IMAGEFILE "Data/image.dat"
+#define WEATHERMAPFILE "Data/weather.dat"
+
 struct Vertex
 {
     long long vid;
@@ -45,12 +50,30 @@ struct Vertex
 
 typedef struct Vertex vertex;
 
+struct Normal
+{
+    double x;
+    double y;
+    double z;
+
+    Normal(){}
+
+    Normal(double _x,double _y, double _z) {
+        x = _x;
+        y = _y;
+        z = _z;
+    }
+};
+
+typedef struct Normal normal;
+
 struct Triangle
 {
     vertex *first, *second, *third;
     unsigned long long tid,vid;
     bool isVisible;
     double corrosionLevel;
+    normal fnormal;
     //probably can include normals
     //color of each vertex
     Triangle() {}
@@ -67,6 +90,8 @@ struct Triangle
     }
 
 };
+
+
 
 typedef struct Triangle triangle;
 class InitializeData
@@ -85,10 +110,13 @@ private:
         void formTriangles(const char* fileName);
 		void populateBoundaryVoxels (const char* fileName);
         double convertDouble(std::string str);
+        void calculateNormals();
+        std::vector<int> colorMap(float corval);
     public:
         void initializeData();
         std::unordered_map<std::string,vertex> map;
         std::vector<triangle> Triangles;
+        std::vector<normal> VNormals;
 
     };
 

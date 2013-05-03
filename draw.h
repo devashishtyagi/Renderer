@@ -1,12 +1,11 @@
 #ifndef DRAW_H
 #define DRAW_H
-
 #endif // DRAW_H
+
+#define GLM_FORCE_RADIANS
 
 #include <GL/glew.h>
 #include <GL/glfw.h>
-#include <glm/glm.hpp>
-#include <glm/gtc/matrix_transform.hpp>
 #include <cstdio>
 #include <cstdlib>
 #include <fstream>
@@ -16,5 +15,5 @@
 #include <string>
 #include <cmath>
 #include <cstdio>
-
-#include "maths_funcs.h"
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>

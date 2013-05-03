@@ -13,10 +13,11 @@
 
 using namespace std;
 
-const int window_width = 800, window_height = 600;
+int window_width = 800, window_height = 600;
 
 vector<GLfloat> points;
 vector<GLfloat> color;
+vector<GLfloat> vnormals;
 
 // View parameters
 glm::vec3 cam_pos(0.0, 0.0, 2.0);
@@ -58,6 +59,7 @@ string textFileRead (const char* fileName) {
         string line;
         while (myfile.good()) {
             getline (myfile, line);
+            data.append("\n");
             data.append(line);
         }
     }
@@ -79,6 +81,10 @@ void fillPoints(InitializeData *v)
             color.push_back(v->Triangles[i].first->g);
             color.push_back(v->Triangles[i].first->b);
 
+           vnormals.push_back(v->Triangles[i].fnormal.x);
+           vnormals.push_back(v->Triangles[i].fnormal.y);
+           vnormals.push_back(v->Triangles[i].fnormal.z);
+
             // 2nd vertex
             points.push_back(v->Triangles[i].second->x);
             points.push_back(v->Triangles[i].second->y);
@@ -88,6 +94,11 @@ void fillPoints(InitializeData *v)
             color.push_back(v->Triangles[i].second->g);
             color.push_back(v->Triangles[i].second->b);
 
+            vnormals.push_back(v->Triangles[i].fnormal.x);
+            vnormals.push_back(v->Triangles[i].fnormal.y);
+            vnormals.push_back(v->Triangles[i].fnormal.z);
+
+
             // 3rd vertex
             points.push_back(v->Triangles[i].third->x);
             points.push_back(v->Triangles[i].third->y);
@@ -96,6 +107,11 @@ void fillPoints(InitializeData *v)
             color.push_back(v->Triangles[i].third->r);
             color.push_back(v->Triangles[i].third->g);
             color.push_back(v->Triangles[i].third->b);
+
+            vnormals.push_back(v->Triangles[i].fnormal.x);
+            vnormals.push_back(v->Triangles[i].fnormal.y);
+            vnormals.push_back(v->Triangles[i].fnormal.z);
+
 
         }
     }
@@ -115,20 +131,54 @@ void buildModel() {
     model_mat = glm::translate(glm::mat4(1.0f), glm::vec3(new_position, 0.0, 0.0));
 }
 
-void updateCameraPos() {
+void updateCameraPosKeyboard() {
     if (glfwGetKey(GLFW_KEY_DOWN) == GLFW_PRESS) {
-        cam_pos.y -= camera_speed;
+        cam_pos.z -= camera_speed;
     }
     if (glfwGetKey(GLFW_KEY_UP) == GLFW_PRESS) {
-        cam_pos.y += camera_speed;
-    }
-    if (glfwGetKey(GLFW_KEY_LEFT) == GLFW_PRESS) {
-            cam_pos.x -= camera_speed;
-    }
-    if (glfwGetKey(GLFW_KEY_RIGHT) == GLFW_PRESS) {
-        cam_pos.x += camera_speed;
+        cam_pos.z += camera_speed;
     }
 }
+
+void GLFWCALL updateCameraPosMouse(int x, int y) {
+	static bool pressed = false;
+    static glm::vec3 V2(0.0, 0.0, 0.0);
+    glm::vec3 V1((double)x, (double)y, 0.0);
+    V1[0] = V1[0]/((double) window_width/2.0) - 1.0;
+    V1[1] = 1.0 - V1[1]/((double) window_height/2.0);
+    if (pow(V1[0], 2) + pow(V1[0], 2) < 1.0) {
+        V1[2] = sqrt(1.0 - pow(V1[0], 2) + pow(V1[1], 2));
+    }
+    else {
+        V1 = glm::normalize(V1);
+    }
+
+	bool performRotation = true;
+	if (glfwGetMouseButton(GLFW_MOUSE_BUTTON_LEFT) != GLFW_PRESS) {
+		pressed = false;
+        V2 = V1;
+		return;
+	}
+    else if(!pressed){
+		performRotation = false;
+		pressed = true;
+	}
+
+	if (performRotation){
+		V1 = glm::normalize(V1);
+		V2 = glm::normalize(V2);
+        glm::vec3 N = glm::cross(V2, V1);
+        float angle = acos(min(1.0f, glm::dot(V1, V2)));
+        if (isnan(angle)) {
+			return;
+		}
+
+        model_mat = glm::rotate(model_mat, (float)((angle*180.0)/M_PI), N);
+	}
+
+    V2 = V1;
+}
+
 
 void _update_fps_counter () {
     // timer/frame counter
@@ -140,7 +190,7 @@ void _update_fps_counter () {
         previous_seconds = current_seconds;
         double fps = (double)frame_count / elapsed_seconds;
         char tmp[128];
-        sprintf (tmp, "opengl @ fps: %.2lf", fps);
+        sprintf (tmp, "Voxel Viewer @ fps: %.2lf", fps);
         glfwSetWindowTitle (tmp);
         frame_count = 0;
     }
@@ -158,6 +208,9 @@ void GLFWCALL resize(int width, int height) {
     proj_mat = glm::perspective(fov, aspect, near, far);
 
     glViewport(0, 0, width, height);
+
+	window_width = width;
+	window_height = height;
 }
 
 int main() {
@@ -167,7 +220,7 @@ int main() {
 
     fillPoints(v);
 
-    cout<<"Number of triangles to be rendered "<<points.size()<<endl;
+    cout<<"Number of triangles to be rendered "<<points.size()/9<<endl;
 
     // start GL context and O/S window using GLFW helper library
     if (glfwInit() != GL_TRUE)
@@ -178,6 +231,7 @@ int main() {
     glewInit();
     // register for resize callback
     glfwSetWindowSizeCallback(resize);
+    glfwSetMousePosCallback(updateCameraPosMouse);
 
     // get version info
     const GLubyte* renderer = glGetString (GL_RENDERER); // get renderer string
@@ -195,6 +249,12 @@ int main() {
     glBindBuffer (GL_ARRAY_BUFFER, vbo_color);
     glBufferData (GL_ARRAY_BUFFER, color.size() * sizeof (GLfloat), &color[0], GL_STATIC_DRAW);
 
+    unsigned int vbo_normal = 0;
+    glGenBuffers (1, &vbo_normal);
+    glBindBuffer (GL_ARRAY_BUFFER, vbo_normal);
+    glBufferData (GL_ARRAY_BUFFER, vnormals.size() * sizeof (GLfloat), &vnormals[0], GL_STATIC_DRAW);
+
+
     unsigned int vao = 0;
     glGenVertexArrays (1, &vao);
     glBindVertexArray (vao);
@@ -203,9 +263,13 @@ int main() {
     glVertexAttribPointer (0, 3, GL_FLOAT, GL_FALSE, 0, (GLubyte*) NULL);
     glBindBuffer (GL_ARRAY_BUFFER, vbo_color);
     glVertexAttribPointer (1, 3, GL_FLOAT, GL_FALSE, 0, (GLubyte*) NULL);
+    glBindBuffer (GL_ARRAY_BUFFER, vbo_normal);
+    glVertexAttribPointer (2, 3, GL_FLOAT, GL_FALSE, 0, (GLubyte*) NULL);
+
 
     glEnableVertexAttribArray (0);
     glEnableVertexAttribArray (1);
+    glEnableVertexAttribArray (2);
 
     std::string vertex_shader = textFileRead ("vs.glsl");
     std::string fragment_shader = textFileRead ("fs.glsl");
@@ -249,19 +313,23 @@ int main() {
     unsigned int view_mat_location = glGetUniformLocation (shader_program, "view");
     unsigned int proj_mat_location = glGetUniformLocation (shader_program, "proj");
     unsigned int model_mat_location = glGetUniformLocation (shader_program, "model");
+    unsigned int orig_model_mat_location = glGetUniformLocation (shader_program, "orig_model_mat");
 
     glUniformMatrix4fv (view_mat_location, 1, GL_FALSE, &view_mat[0][0]);
     glUniformMatrix4fv (proj_mat_location, 1, GL_FALSE, &proj_mat[0][0]);
     glUniformMatrix4fv (model_mat_location, 1, GL_FALSE, &model_mat[0][0]);
+    glUniformMatrix4fv (orig_model_mat_location, 1, GL_FALSE, &model_mat[0][0]);
 
     while (running) {
         glClear (GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
          _update_fps_counter ();
 
-        updateCameraPos();
+        updateCameraPosKeyboard();
+
         buildView();
         glUniformMatrix4fv (view_mat_location, 1, GL_FALSE, &view_mat[0][0]);
+        glUniformMatrix4fv (model_mat_location, 1, GL_FALSE, &model_mat[0][0]);
 
         glBindVertexArray (vao);
         glDrawArrays (GL_LINE_STRIP, 0, (GLint)points.size()/3);

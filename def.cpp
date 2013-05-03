@@ -21,6 +21,10 @@ using namespace std;
 
 unsigned long long universalTid;
 
+// DEBUG VARIABLE
+float MAXWEATHER = 0.0;
+int greaterCount = 0;
+
 double InitializeData::convertDouble(string str) {
     double ans;
     stringstream sstr(str); // create a stringstream
@@ -62,23 +66,20 @@ void InitializeData::buildMap(const char *imageFile, const char *weatherMapFile)
     }
 	
     for(int i = 0; i < imx; i++) {
-        for(int j = 0; j < imy; j++)
+        for(int j = 0; j < imy; j++){
             colormap[weatherDegree[i][j]] = make_pair(imageStore[i][j][0], make_pair(imageStore[i][j][1], imageStore[i][j][2]));
+        }
     }
 	
+//    for(auto it = colormap.begin(); it != colormap.end(); ++it) {
+//        cout<<it->first<<endl;
+//    }
+
     imfile.close();
     wmfile.close();
 }
 
 //Do all in one read of the data file -- for faster work
-
-
-
-
-
-
-
-
 
 void InitializeData::populateBoundaryVoxels (const char* fileName) {
 	ifstream myfile (fileName);
@@ -221,7 +222,6 @@ void InitializeData::triPush(string p1, string p2, string p3, pair<int,float> vd
         point3->second.curIndex++;
     }
 	
-	
     triangle t(&(point1->second),&(point2->second),&(point3->second),universalTid,vd.first,-vd.second,visible);
 	
     Triangles.push_back(t);
@@ -241,15 +241,18 @@ void InitializeData::formTriangles(const char* fileName)
 	
     if (myfile.is_open()) {
         int index = 0;
+        int corroded;
+
         while (myfile.good()) {
             getline (myfile, data);
-			
+
             if(index == 0 ) {
                 stringstream ss(data);
                 int voxelID;
                 string aux;
                 double weathingD;
-                ss>>voxelID>>aux;
+                corroded = 1;
+                ss>>voxelID>>aux>>corroded;
                 if (aux.length() > 0)
                     weathingD = convertDouble(aux.substr(1));
                 else
@@ -262,15 +265,15 @@ void InitializeData::formTriangles(const char* fileName)
             else if (index == 9){
 				stringstream ss(data);
                 string a[6];
-                int b[6],c[6];
-                ss>>a[0]>>b[0]>>c[0]>>a[1]>>b[1]>>c[1]>>a[2]>>b[2]>>c[2]>>a[3]>>b[3]>>c[3]>>a[4]>>b[4]>>c[4]>>a[5]>>b[5]>>c[5];
+                int b[6],c[6],d[6];
+                ss>>a[0]>>b[0]>>c[0]>>d[0]>>a[1]>>b[1]>>c[1]>>d[1]>>a[2]>>b[2]>>c[2]>>d[2]>>a[3]>>b[3]>>c[3]>>d[3]>>a[4]>>b[4]>>c[4]>>d[4]>>a[5]>>b[5]>>c[5]>>d[5];
 				bool visibleVoxel = false;
-				if(b[0] == -1 || b[1] == -1|| b[2] == -1 || b[3] == -1 || b[4] == -1 || b[5] == -1)
+                if(b[0] == -1 || b[1] == -1|| b[2] == -1 || b[3] == -1 || b[4] == -1 || b[5] == -1 || d[0] == 1 || d[1] == 1|| d[2] == 1 || d[3] == 1 || d[4] == 1 || d[5] == 1)
 					visibleVoxel = true;
 				//Only if the voxel is visible I would push the points in my unordered map
 				
 				if (visibleVoxel) {
-					for ( int num = 0; num < cube.size(); num++) {
+                    for ( int num = 0; num < (int)cube.size(); num++) {
 						string data = cube[num];
 						vector<double> points(3);
 						unordered_map<string,vertex>::const_iterator got = map.find (data);
@@ -280,43 +283,55 @@ void InitializeData::formTriangles(const char* fileName)
 							vertex m(points[0],points[1],points[2]);
 							map[data] = m;
 						}
-						
+
 					}
-					//front face -- 0
+
+                    // Put the vertices in anti clockwise direction so
+                    // the normals point outward from the surface.
+                    /*
+                            4++++++++0
+                          +       +
+                        5++++++++1   +
+                        +   +    +   +
+                        +   7++++++++3
+                        6++++++++2
+                    */
+
+                    //right face -- 0
 					bool visible = false;
-					if(b[0] == -1)
+                    if(d[0] == 1 && corroded == 0)
 						visible = true;
 					
-					triPush(cube[0], cube[1], cube[2],voxelDetails,visible);
-					triPush(cube[0], cube[2], cube[3],voxelDetails,visible);
+                    triPush(cube[0], cube[1], cube[2],voxelDetails,visible);
+                    triPush(cube[0], cube[2], cube[3],voxelDetails,visible);
 					
-					//right face -- 1
+                    //back face -- 1
 					visible = false;
-					if(b[1] == -1)
+                    if(d[1] == 1 && corroded == 0)
 						visible = true;
 					
-					triPush(cube[4], cube[0], cube[7],voxelDetails,visible);
-					triPush(cube[4], cube[3], cube[7],voxelDetails,visible);
+                    triPush(cube[4], cube[0], cube[7],voxelDetails,visible);
+                    triPush(cube[0], cube[3], cube[7],voxelDetails,visible);
 					
-					//back face -- 2
+                    //left face -- 2
 					visible = false;
-					if(b[2] == -1)
+                    if(d[2] == 1 && corroded == 0)
 						visible = true;
 					
-					triPush(cube[4], cube[5], cube[7],voxelDetails,visible);
-					triPush(cube[5], cube[7], cube[6],voxelDetails,visible);
+                    triPush(cube[4], cube[7], cube[5],voxelDetails,visible);
+                    triPush(cube[5], cube[7], cube[6],voxelDetails,visible);
 					
-					//left face -- 3
+                    //front face -- 3
 					visible = false;
-					if(b[3] == -1)
+                    if(d[3] == 1 && corroded == 0)
 						visible = true;
 					
-					triPush(cube[1], cube[5], cube[6],voxelDetails,visible);
-					triPush(cube[1], cube[6], cube[2],voxelDetails,visible);
+                    triPush(cube[1], cube[5], cube[6],voxelDetails,visible);
+                    triPush(cube[1], cube[6], cube[2],voxelDetails,visible);
 					
 					// top face -- 4
 					visible = false;
-					if(b[4] == -1)
+                    if(d[4] == 1 && corroded == 0)
 						visible = true;
 					
 					triPush(cube[4], cube[5], cube[1],voxelDetails,visible);
@@ -324,15 +339,12 @@ void InitializeData::formTriangles(const char* fileName)
 					
 					//bottom face -- 5
 					visible = false;
-					if(b[5] == -1)
+                    if(d[5] == 1 && corroded == 0)
 						visible = true;
 					
-					triPush(cube[3], cube[2], cube[6],voxelDetails,visible);
-					triPush(cube[3], cube[6], cube[7],voxelDetails,visible);
-					
-					
+                    triPush(cube[2], cube[6], cube[7],voxelDetails,visible);
+                    triPush(cube[2], cube[7], cube[3],voxelDetails,visible);
 				}
-				
 			}
             index = (index+1)%10;
         }
@@ -352,6 +364,75 @@ map< double, pair< int, pair<int,int> > >::const_iterator findClose(map< double,
     return last;
 }
 
+vector<int> InitializeData::colorMap(float corval) {
+    vector<int> rgb(3,0);
+    if(corval >= 0.0 && corval <= 0.1)
+    {
+        rgb[0] = 215;
+        rgb[1] = 0;
+        rgb[2] = 0;
+    }
+    else if(corval > 0.1 && corval <= 0.2)
+    {
+        rgb[0] = 215;
+        rgb[1] = 95;
+        rgb[2] = 0;
+    }
+    else if(corval > 0.2 && corval <= 0.3)
+    {
+        rgb[0] = 215;
+        rgb[1] = 135;
+        rgb[2] = 0;
+    }
+    else if(corval > 0.3 && corval <= 0.4)
+    {
+        rgb[0] = 215;
+        rgb[1] = 175;
+        rgb[2] = 0;
+    }
+    else if(corval > 0.4 && corval <= 0.5)
+    {
+        rgb[0] = 215;
+        rgb[1] = 215;
+        rgb[2] = 0;
+    }
+    else if(corval > 0.5 && corval <= 0.6)
+    {
+        rgb[0] = 215;
+        rgb[1] = 255;
+        rgb[2] = 0;
+    }
+    else if(corval > 0.6 && corval <= 0.7)
+    {
+        rgb[0] = 255;
+        rgb[1] = 255;
+        rgb[2] = 0;
+    }
+    else if(corval > 0.7 && corval <= 0.8)
+    {
+        rgb[0] = 255;
+        rgb[1] = 215;
+        rgb[2] = 0;
+    }
+    else if(corval > 0.8 && corval <= 0.9)
+    {
+        rgb[0] = 255;
+        rgb[1] = 175;
+        rgb[2] = 0;
+    }
+    else
+    {
+        rgb[0] = 255;
+        rgb[1] = 135;
+        rgb[2] = 0;
+    }
+    return rgb;
+
+
+}
+
+
+
 // impart color to all the vertices depeding on their neighbourhood
 void InitializeData::impartColor()
 {
@@ -369,47 +450,113 @@ void InitializeData::impartColor()
                 sum +=	 Triangles[q.neighbours[i]].corrosionLevel;
                 count++;
             }
-			
         }
         float val = sum / (1.0f * count);
 		
         it->second.avgCorrosionLevel = val;
-        //auto low = findClose(colormap, val);
-		
+
         /*
-		 float color = 1.0f - (1.0f-0.62f)*val;
-		 float color;
-		 if (val >= 0.5)
-		 color = 1.0f;
-		 else
-		 color = 0.0f;
-		 */
-		
-		//        it->second.r = (double)low->second.first/255.0;
-		//        it->second.g = (double)low->second.second.first/255.0;
-		//        it->second.b = (double)low->second.second.second/255.0;
-		
-        it->second.r = val;
-        it->second.g = val;
-        it->second.b = 1.0 - val;
+        auto low = colormap.begin();
+        it->second.r = (double)((low->second.first))/255.0;
+        it->second.g = (double)((low->second.second.first))/255.0;
+        it->second.b = (double)((low->second.second.second))/255.0;
+        */
+
+        /*
+        auto pos = findClose(colormap, val);
+        auto low = pos;
+        */
+        /*
+        auto up = ++pos;
+        if (up == colormap.end())
+            up = low;
+        */
+        /*
+        auto up = --pos;
+
+
+        double w1 = (val - up->first)/(low->first - up->first);
+        if (!(w1 >= 0.0 && w1 <= 1.0))
+            w1 = 1.0;
+        it->second.r = (double)(w1*(low->second.first) + (1.0-w1)*(up->second.first))/255.0;
+        it->second.g = (double)(w1*(low->second.second.first) + (1.0-w1)*(up->second.second.first))/255.0;
+        it->second.b = (double)(w1*(low->second.second.second) + (1.0-w1)*(up->second.second.second))/255.0;
+        */
+
+        MAXWEATHER = max(MAXWEATHER, val);
+        if (val > 1.0)
+            greaterCount++;
+
+//       it->second.r = 0.2 + 0.4*(1.0-val);
+//        it->second.g = 0.2 + 0.4*(1.0-val);
+//        it->second.b = 0.2 + 0.4*(1.0-val);
+//        it->second.r = (1.0-val);
+//        it->second.g = (1.0-val);
+//        it->second.b = (1.0-val);
+
+        vector<int> rgb = colorMap(val);
+        it->second.r = 1.0*rgb[0]/255.0;
+        it->second.g = 1.0*rgb[1]/255.0;
+        it->second.b = 1.0*rgb[2]/255.0;
+
+
     }
 }
 
+
+
+
+void InitializeData::calculateNormals()
+{
+    for(auto it = Triangles.begin(); it != Triangles.end(); ++it)
+    {
+        double ux = it->second->x - it->first->x;
+        double uy = it->second->y - it->first->y;
+        double uz = it->second->z - it->first->z;
+
+        double vx = it->third->x - it->first->x;
+        double vy = it->third->y - it->first->y;
+        double vz = it->third->z - it->first->z;
+
+        double _x = (uy*vz) - (uz*vy);
+        double _y = (uz*vx) - (ux*vz);
+        double _z = (ux*vy) - (uy*vx);
+
+        double magnitude = _x*_x + _y*_y +_z*_z;
+        if(magnitude  == 0.0){
+                _x = 0.0;
+                _y = 0.0;
+                _z = 1.0;
+        }
+        else {
+            _x /= magnitude;
+            _y /= magnitude;
+            _z /= magnitude;
+
+        }
+        normal n(_x,_y,_z);
+        it->fnormal = n;
+
+    }
+}
 
 
 void InitializeData::initializeData()
 {
     universalTid = 0;
     runningAlpha = 0.8;
-	//    populateBoundaryVoxels("Data/voxels2.txt");
-	//	cout<<"Voxels Selected "<<boundaryVoxelList.size()<<endl;
-	//    readPoints("Data/voxels2.txt");
-	//    cout<<"Reading done"<<map.size()<<endl;
-    formTriangles("Data/voxels2.txt");
+    //    populateBoundaryVoxels("Data/voxels2.txt");
+    //	cout<<"Voxels Selected "<<boundaryVoxelList.size()<<endl;
+    //    readPoints("Data/voxels2.txt");
+    //    cout<<"Reading done"<<map.size()<<endl;
+    formTriangles(VOXELFILE);
     cout<<"Traingles Formed"<<endl;
-    // buildMap("Data/image.dat", "Data/weather.dat");
+    buildMap(IMAGEFILE, WEATHERMAPFILE);
+    //cout<<colormap.begin()->first<<" "<<colormap.begin()->second.first<<" "<<colormap.begin()->second.second.first<<" "<<colormap.begin()->second.second.second<<endl;
     cout<<"Weather Map read"<<endl;
     impartColor();
+    //cout<<"MAXIMUM WEATHERING DEGREE IS "<<MAXWEATHER<<" and count is "<<greaterCount<<endl;
+    calculateNormals();
 }
 
 #ifdef __APPLE__
