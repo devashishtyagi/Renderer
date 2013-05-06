@@ -541,7 +541,7 @@ void InitializeData::calculateNormals()
 }
 
 
-void InitializeData::initializeData()
+void InitializeData::initializeData(string _fileName)
 {
     universalTid = 0;
     runningAlpha = 0.8;
@@ -549,6 +549,7 @@ void InitializeData::initializeData()
     //	cout<<"Voxels Selected "<<boundaryVoxelList.size()<<endl;
     //    readPoints("Data/voxels2.txt");
     //    cout<<"Reading done"<<map.size()<<endl;
+    VOXELFILE = _fileName;
     formTriangles(VOXELFILE);
     cout<<"Traingles Formed"<<endl;
     buildMap(IMAGEFILE, WEATHERMAPFILE);

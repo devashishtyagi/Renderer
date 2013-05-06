@@ -10,7 +10,7 @@
 #include <string>
 
 
-#define VOXELFILE "Data/stochastic_model_level_0000900.txt"
+//#define VOXELFILE "Data/stochastic_model_level_0000900.txt"
 #define IMAGEFILE "Data/image.dat"
 #define WEATHERMAPFILE "Data/weather.dat"
 
@@ -97,6 +97,7 @@ typedef struct Triangle triangle;
 class InitializeData
     {
 private:
+        string VOXELFILE;
         double runningAlpha;
         std::vector< std::vector< std::vector<int> > > imageStore;
         std::vector< std::vector<double> > weatherDegree;
@@ -113,7 +114,7 @@ private:
         void calculateNormals();
         std::vector<int> colorMap(float corval);
     public:
-        void initializeData();
+        void initializeData(std::string _fileName);
         std::unordered_map<std::string,vertex> map;
         std::vector<triangle> Triangles;
         std::vector<normal> VNormals;
