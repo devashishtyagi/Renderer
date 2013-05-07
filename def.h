@@ -97,8 +97,13 @@ typedef struct Triangle triangle;
 class InitializeData
     {
 private:
-        string VOXELFILE;
+        vector<string> VoxelsFiles;
         double runningAlpha;
+        // This would indicate whether sides would be rendered or not
+        bool sides;
+        // We will number the different color model and change them on a c click
+        int colorModel;
+        int currentFile;
         std::vector< std::vector< std::vector<int> > > imageStore;
         std::vector< std::vector<double> > weatherDegree;
         std::map< double, std::pair< int, std::pair<int,int> > > colormap;
@@ -113,8 +118,11 @@ private:
         double convertDouble(std::string str);
         void calculateNormals();
         std::vector<int> colorMap(float corval);
-        void InitializeData::formTrianglesTopAndBottom(const char* fileName)
+        void formTrianglesTopAndBottom(const char* fileName);
+        void Calculate();
     public:
+        void changeColorModel();
+        void changeFile(bool increase);
         void changeTriangleArray();
         void initializeData(std::string _fileName);
         std::unordered_map<std::string,vertex> map;

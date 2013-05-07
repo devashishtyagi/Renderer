@@ -231,14 +231,20 @@ void GLFWCALL resize(int width, int height) {
 int main(int argc, char *argv[]) {
 
 
-     if (argc != 2){
-    cerr << "The number of arguments is not appropriate - Terminating" << endl;
-    return;
-  }
+     if (!(argc >= 2)) {
+        cerr << "The number of arguments is not appropriate - Terminating" << endl;
+        return;
+    }
+
+    vector<string> a;
+    for(int i=1;i<argc;i++)
+        a.push_back(argv[i]);
+
+
 
     //fill in the data
     InitializeData *v = new InitializeData();
-    v->initializeData(argv[1]);
+    v->initializeData(a);
 
     fillPoints(v);
 

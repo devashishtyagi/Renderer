@@ -670,48 +670,78 @@ void InitializeData::formTrianglesTopAndBottom(const char* fileName)
 }
 
 
-
-
-
-
-
-void InitializeData::changeTriangleArray() {
+void InitializeData::Calculate() {
 
     Triangles.clear();
-    //form the traingles 
-    formTrianglesTopAndBottom(VOXELFILE);
-    //Also impart the color
-    impartColor();
-
-
-    //Also form the normals
-    calculateNormals();
-
-
-    
-
-
-}
-
-
-void InitializeData::initializeData(string _fileName)
-{
-    universalTid = 0;
-    runningAlpha = 0.8;
-    //    populateBoundaryVoxels("Data/voxels2.txt");
-    //	cout<<"Voxels Selected "<<boundaryVoxelList.size()<<endl;
-    //    readPoints("Data/voxels2.txt");
-    //    cout<<"Reading done"<<map.size()<<endl;
-    VOXELFILE = _fileName;
-    formTriangles(VOXELFILE);
+    if(sides)
+        formTriangles(VoxelFiles[currentFile]);
+    else
+        formTrianglesTopAndBottom(VoxelFiles[currentFile]);
     cout<<"Traingles Formed"<<endl;
     buildMap(IMAGEFILE, WEATHERMAPFILE);
-    //cout<<colormap.begin()->first<<" "<<colormap.begin()->second.first<<" "<<colormap.begin()->second.second.first<<" "<<colormap.begin()->second.second.second<<endl;
     cout<<"Weather Map read"<<endl;
     impartColor();
-    //cout<<"MAXIMUM WEATHERING DEGREE IS "<<MAXWEATHER<<" and count is "<<greaterCount<<endl;
+    cout<<"Color Imparted"<<endl;
     calculateNormals();
+    cout<<"Normals Calculated"<<endl;
 }
+
+void InitializeData::changeColorModel() {
+
+    
+}
+
+
+
+
+void InitializeData::noSides() {
+
+    sides = !sides;
+
+    Calculate();
+}
+
+
+void InitializeData::changeFile(bool increase) {
+
+    // Increase
+    if (increase)
+    {
+        if(currentFile < VoxelFiles.size()-1)
+        {
+            currentFile++;
+            Calculate();
+
+        }
+
+    }
+    else
+    {
+        if(currentFile > 0)
+        {
+            currentFile--;
+            Calculate();
+
+        }
+
+    }
+
+}
+
+
+
+
+void InitializeData::initializeData(vector<string> files)
+{
+    // Initialize Data
+    colorModel = 1;
+    sides = true;
+    VoxelFiles = files;
+    currentFile = 0;
+
+    Calculate();
+}
+
 
 #ifdef __APPLE__
 int main() {
