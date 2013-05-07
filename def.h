@@ -113,7 +113,9 @@ private:
         double convertDouble(std::string str);
         void calculateNormals();
         std::vector<int> colorMap(float corval);
+        void InitializeData::formTrianglesTopAndBottom(const char* fileName)
     public:
+        void changeTriangleArray();
         void initializeData(std::string _fileName);
         std::unordered_map<std::string,vertex> map;
         std::vector<triangle> Triangles;

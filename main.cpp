@@ -257,8 +257,7 @@ int main(int argc, char *argv[]) {
 
     // get version info
     const GLubyte* renderer = glGetString (GL_RENDERER); // get renderer string
-    const GLubyte* version = glGetString (GL_VERSION); // version as a string
-    printf("Renderer: %s\n", renderer);
+    const GLubyte* version = glGxconderer);
     printf("OpenGL version supported %s\n", version);
 
     unsigned int vbo_vertex = 0;
