@@ -19,6 +19,8 @@ vector<GLfloat> points;
 vector<GLfloat> color;
 vector<GLfloat> vnormals;
 
+GLenum draw_mode;
+
 // View parameters
 glm::vec3 cam_pos(0.0, 0.0, 2.0);
 float cam_yaw = 0.0f; // y-rotation in degrees
@@ -138,6 +140,19 @@ void updateCameraPosKeyboard() {
     if (glfwGetKey(GLFW_KEY_UP) == GLFW_PRESS) {
         cam_pos.z += camera_speed;
     }
+
+    if (glfwGetKey(GLFW_KEY_TAB) == GLFW_PRESS)
+    {
+        if (draw_mode == GL_TRIANGLES) {
+            draw_mode = GL_LINE_STRIP;
+        }
+        else {
+            draw_mode = GL_TRIANGLES;
+        }
+    }
+
+
+
 }
 
 void GLFWCALL updateCameraPosMouse(int x, int y) {
@@ -213,10 +228,17 @@ void GLFWCALL resize(int width, int height) {
 	window_height = height;
 }
 
-int main() {
+int main(int argc, char *argv[]) {
+
+
+     if (argc != 2){
+    cerr << "The number of arguments is not appropriate - Terminating" << endl;
+    return;
+  }
+
     //fill in the data
     InitializeData *v = new InitializeData();
-    v->initializeData();
+    v->initializeData(argv[1]);
 
     fillPoints(v);
 
@@ -235,8 +257,7 @@ int main() {
 
     // get version info
     const GLubyte* renderer = glGetString (GL_RENDERER); // get renderer string
-    const GLubyte* version = glGetString (GL_VERSION); // version as a string
-    printf("Renderer: %s\n", renderer);
+    const GLubyte* version = glGxconderer);
     printf("OpenGL version supported %s\n", version);
 
     unsigned int vbo_vertex = 0;
@@ -320,6 +341,8 @@ int main() {
     glUniformMatrix4fv (model_mat_location, 1, GL_FALSE, &model_mat[0][0]);
     glUniformMatrix4fv (orig_model_mat_location, 1, GL_FALSE, &model_mat[0][0]);
 
+    draw_mode = GL_TRIANGLES;
+
     while (running) {
         glClear (GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
@@ -332,7 +355,7 @@ int main() {
         glUniformMatrix4fv (model_mat_location, 1, GL_FALSE, &model_mat[0][0]);
 
         glBindVertexArray (vao);
-        glDrawArrays (GL_LINE_STRIP, 0, (GLint)points.size()/3);
+        glDrawArrays (draw_mode, 0, (GLint)points.size()/3);
         glfwSwapBuffers();
         running = !glfwGetKey(GLFW_KEY_ESC) && glfwGetWindowParam (GLFW_OPENED);
         glBindVertexArray(0);

@@ -541,7 +541,160 @@ void InitializeData::calculateNormals()
 }
 
 
-void InitializeData::initializeData()
+void InitializeData::formTrianglesTopAndBottom(const char* fileName)
+{
+    
+    ifstream myfile (fileName);
+    
+    pair<int,double> voxelDetails;
+    vector<string> cube(8);
+    string data;
+    
+    if (myfile.is_open()) {
+        int index = 0;
+        int corroded;
+
+        while (myfile.good()) {
+            getline (myfile, data);
+
+            if(index == 0 ) {
+                stringstream ss(data);
+                int voxelID;
+                string aux;
+                double weathingD;
+                corroded = 1;
+                ss>>voxelID>>aux>>corroded;
+                if (aux.length() > 0)
+                    weathingD = convertDouble(aux.substr(1));
+                else
+                    weathingD = 0.0;
+                voxelDetails = make_pair(voxelID,weathingD); // would be used in each of the 12 traingles
+                
+            }
+            else if (index >= 1 && index <= 8 )
+                cube[index-1] = data;
+            else if (index == 9){
+                stringstream ss(data);
+                string a[6];
+                int b[6],c[6],d[6];
+                ss>>a[0]>>b[0]>>c[0]>>d[0]>>a[1]>>b[1]>>c[1]>>d[1]>>a[2]>>b[2]>>c[2]>>d[2]>>a[3]>>b[3]>>c[3]>>d[3]>>a[4]>>b[4]>>c[4]>>d[4]>>a[5]>>b[5]>>c[5]>>d[5];
+                bool visibleVoxel = false;
+                if(b[0] == -1 || b[1] == -1|| b[2] == -1 || b[3] == -1 || b[4] == -1 || b[5] == -1 || d[0] == 1 || d[1] == 1|| d[2] == 1 || d[3] == 1 || d[4] == 1 || d[5] == 1)
+                    visibleVoxel = true;
+                //Only if the voxel is visible I would push the points in my unordered map
+                
+                if (visibleVoxel) {
+                    for ( int num = 0; num < (int)cube.size(); num++) {
+                        string data = cube[num];
+                        vector<double> points(3);
+                        unordered_map<string,vertex>::const_iterator got = map.find (data);
+                        if ( got == map.end() ) { // new vertex
+                            stringstream ss(data);
+                            ss>>points[0]>>points[1]>>points[2];
+                            vertex m(points[0],points[1],points[2]);
+                            map[data] = m;
+                        }
+
+                    }
+
+                    // Put the vertices in anti clockwise direction so
+                    // the normals point outward from the surface.
+                    /*
+                            4++++++++0
+                          +       +
+                        5++++++++1   +
+                        +   +    +   +
+                        +   7++++++++3
+                        6++++++++2
+                    */
+                    //voxel is visible only is the top or bottom face is also visible
+                    
+                    bool surface = false;
+                    //top face    
+                    if((d[4] == 1 || d[5] == 1) && corroded == 0)
+                        surface = true;
+
+
+                    //right face -- 0
+                    bool visible = false;
+                    if(d[0] == 1 && corroded == 0 && surface)
+                        visible = true;
+                    
+                    triPush(cube[0], cube[1], cube[2],voxelDetails,visible);
+                    triPush(cube[0], cube[2], cube[3],voxelDetails,visible);
+                    
+                    //back face -- 1
+                    visible = false;
+                    if(d[1] == 1 && corroded == 0 && surface)
+                        visible = true;
+                    
+                    triPush(cube[4], cube[0], cube[7],voxelDetails,visible);
+                    triPush(cube[0], cube[3], cube[7],voxelDetails,visible);
+                    
+                    //left face -- 2
+                    visible = false;
+                    if(d[2] == 1 && corroded == 0 && surface)
+                        visible = true;
+                    
+                    triPush(cube[4], cube[7], cube[5],voxelDetails,visible);
+                    triPush(cube[5], cube[7], cube[6],voxelDetails,visible);
+                    
+                    //front face -- 3
+                    visible = false;
+                    if(d[3] == 1 && corroded == 0 && surface)
+                        visible = true;
+                    
+                    triPush(cube[1], cube[5], cube[6],voxelDetails,visible);
+                    triPush(cube[1], cube[6], cube[2],voxelDetails,visible);
+                    
+                    // top face -- 4
+                    visible = false;
+                    if(d[4] == 1 && corroded == 0 && surface)
+                        visible = true;
+                    
+                    triPush(cube[4], cube[5], cube[1],voxelDetails,visible);
+                    triPush(cube[4], cube[1], cube[0],voxelDetails,visible);
+                    
+                    //bottom face -- 5
+                    visible = false;
+                    if(d[5] == 1 && corroded == 0 && surface)
+                        visible = true;
+                    
+                    triPush(cube[2], cube[6], cube[7],voxelDetails,visible);
+                    triPush(cube[2], cube[7], cube[3],voxelDetails,visible);
+                }
+            }
+            index = (index+1)%10;
+        }
+    }
+}
+
+
+
+
+
+
+
+void InitializeData::changeTriangleArray() {
+
+    Triangles.clear();
+    //form the traingles 
+    formTrianglesTopAndBottom(VOXELFILE);
+    //Also impart the color
+    impartColor();
+
+
+    //Also form the normals
+    calculateNormals();
+
+
+    
+
+
+}
+
+
+void InitializeData::initializeData(string _fileName)
 {
     universalTid = 0;
     runningAlpha = 0.8;
@@ -549,6 +702,7 @@ void InitializeData::initializeData()
     //	cout<<"Voxels Selected "<<boundaryVoxelList.size()<<endl;
     //    readPoints("Data/voxels2.txt");
     //    cout<<"Reading done"<<map.size()<<endl;
+    VOXELFILE = _fileName;
     formTriangles(VOXELFILE);
     cout<<"Traingles Formed"<<endl;
     buildMap(IMAGEFILE, WEATHERMAPFILE);
