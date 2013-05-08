@@ -172,6 +172,7 @@ void updateCameraPosKeyboard() {
     static bool leftEventActive = false;
     static bool rightEventActive = false;
     static bool spaceEventActive = false;
+    static bool homeEventActive = false;
 
     if (glfwGetKey(GLFW_KEY_DOWN) == GLFW_PRESS) {
         cam_pos.z -= camera_speed;
@@ -244,6 +245,24 @@ void updateCameraPosKeyboard() {
             glBufferData (GL_ARRAY_BUFFER, color.size() * sizeof (GLfloat), &color[0], GL_DYNAMIC_DRAW);
             
             spaceEventActive = false;            
+        }
+    }
+    if (glfwGetKey(GLFW_KEY_HOME) == GLFW_PRESS) {
+        homeEventActive = true;
+    }
+    else  {
+        if(homeEventActive) {
+            v->changeSides();
+            fillPoints(v);
+            glBindBuffer (GL_ARRAY_BUFFER, vbo_vertex);
+            glBufferData (GL_ARRAY_BUFFER, points.size() * sizeof (GLfloat), &points[0], GL_DYNAMIC_DRAW);
+            glBindBuffer (GL_ARRAY_BUFFER, vbo_color);
+            glBufferData (GL_ARRAY_BUFFER, color.size() * sizeof (GLfloat), &color[0], GL_DYNAMIC_DRAW);
+            glBindBuffer (GL_ARRAY_BUFFER, vbo_normal);
+            glBufferData (GL_ARRAY_BUFFER, vnormals.size() * sizeof (GLfloat), &vnormals[0], GL_DYNAMIC_DRAW);
+
+
+            homeEventActive = false;
         }
     }
 
