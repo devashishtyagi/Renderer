@@ -70,10 +70,6 @@ void InitializeData::buildMap(const char *imageFile, const char *weatherMapFile)
             colormap[weatherDegree[i][j]] = make_pair(imageStore[i][j][0], make_pair(imageStore[i][j][1], imageStore[i][j][2]));
         }
     }
-	
-//    for(auto it = colormap.begin(); it != colormap.end(); ++it) {
-//        cout<<it->first<<endl;
-//    }
 
     imfile.close();
     wmfile.close();
@@ -431,8 +427,6 @@ vector<int> InitializeData::colorMap(float corval) {
 
 }
 
-
-
 // impart color to all the vertices depeding on their neighbourhood
 void InitializeData::impartColor()
 {
@@ -498,8 +492,6 @@ void InitializeData::impartColor()
         it->second.r = 1.0*rgb[0]/255.0;
         it->second.g = 1.0*rgb[1]/255.0;
         it->second.b = 1.0*rgb[2]/255.0;
-
-
     }
 }
 
@@ -673,10 +665,11 @@ void InitializeData::formTrianglesTopAndBottom(const char* fileName)
 void InitializeData::Calculate() {
 
     Triangles.clear();
+    map.clear();
     if(sides)
-        formTriangles(VoxelFiles[currentFile]);
+        formTriangles(VoxelFiles[currentFile].c_str());
     else
-        formTrianglesTopAndBottom(VoxelFiles[currentFile]);
+        formTrianglesTopAndBottom(VoxelFiles[currentFile].c_str());
     cout<<"Traingles Formed"<<endl;
     buildMap(IMAGEFILE, WEATHERMAPFILE);
     cout<<"Weather Map read"<<endl;
@@ -687,33 +680,23 @@ void InitializeData::Calculate() {
 }
 
 void InitializeData::changeColorModel() {
-
     
 }
 
-
-
-
-void InitializeData::noSides() {
-
+void InitializeData::changeSides() {
     sides = !sides;
-
     Calculate();
 }
 
-
 void InitializeData::changeFile(bool increase) {
-
     // Increase
     if (increase)
     {
-        if(currentFile < VoxelFiles.size()-1)
+        if(currentFile < (int)VoxelFiles.size()-1)
         {
             currentFile++;
             Calculate();
-
         }
-
     }
     else
     {
@@ -723,22 +706,17 @@ void InitializeData::changeFile(bool increase) {
             Calculate();
 
         }
-
     }
 
 }
-
-
-
 
 void InitializeData::initializeData(vector<string> files)
 {
     // Initialize Data
     colorModel = 1;
-    sides = true;
+    sides = false;
     VoxelFiles = files;
     currentFile = 0;
-
     Calculate();
 }
 

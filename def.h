@@ -9,8 +9,6 @@
 #include <cstring>
 #include <string>
 
-
-//#define VOXELFILE "Data/stochastic_model_level_0000900.txt"
 #define IMAGEFILE "Data/image.dat"
 #define WEATHERMAPFILE "Data/weather.dat"
 
@@ -97,7 +95,7 @@ typedef struct Triangle triangle;
 class InitializeData
     {
 private:
-        vector<string> VoxelsFiles;
+        std::vector< std::string > VoxelFiles;
         double runningAlpha;
         // This would indicate whether sides would be rendered or not
         bool sides;
@@ -124,7 +122,8 @@ private:
         void changeColorModel();
         void changeFile(bool increase);
         void changeTriangleArray();
-        void initializeData(std::string _fileName);
+        void changeSides();
+        void initializeData(std::vector< std::string > files);
         std::unordered_map<std::string,vertex> map;
         std::vector<triangle> Triangles;
         std::vector<normal> VNormals;
