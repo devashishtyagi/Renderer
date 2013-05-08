@@ -430,8 +430,8 @@ vector<int> InitializeData::colorMap(float corval) {
 // impart color to all the vertices depeding on their neighbourhood
 void InitializeData::impartColor()
 {
+
     // we can run through all vertices use the neighbourhood information and impart them a color using the corrosion values of the neighbours
-	
     for ( auto it = map.begin(); it != map.end(); ++it )
     {
         vertex q = it->second;
@@ -477,9 +477,6 @@ void InitializeData::impartColor()
         it->second.b = (double)(w1*(low->second.second.second) + (1.0-w1)*(up->second.second.second))/255.0;
         */
 
-        MAXWEATHER = max(MAXWEATHER, val);
-        if (val > 1.0)
-            greaterCount++;
 
 //       it->second.r = 0.2 + 0.4*(1.0-val);
 //        it->second.g = 0.2 + 0.4*(1.0-val);
@@ -492,6 +489,8 @@ void InitializeData::impartColor()
         it->second.r = 1.0*rgb[0]/255.0;
         it->second.g = 1.0*rgb[1]/255.0;
         it->second.b = 1.0*rgb[2]/255.0;
+
+
     }
 }
 
@@ -666,6 +665,7 @@ void InitializeData::Calculate() {
 
     Triangles.clear();
     map.clear();
+    universalTid = 0;
     if(sides)
         formTriangles(VoxelFiles[currentFile].c_str());
     else
@@ -714,7 +714,7 @@ void InitializeData::initializeData(vector<string> files)
 {
     // Initialize Data
     colorModel = 1;
-    sides = false;
+    sides = true;
     VoxelFiles = files;
     currentFile = 0;
     Calculate();

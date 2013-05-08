@@ -40,7 +40,7 @@ float fov = 45.0f;
 InitializeData *v;
 
 // VBO data objects
-unsigned int vbo_vertex, vbo_color, vbo_normal;
+unsigned int vbo_vertex, vbo_color, vbo_normal,vao;
 
 static void checkError(GLint status, const char *msg)
 {
@@ -143,6 +143,7 @@ void buildModel() {
 void updateCameraPosKeyboard() {
     static bool tabEventActive = false;
     static bool leftEventActive = false;
+    static bool rightEventActive = false;
 
     if (glfwGetKey(GLFW_KEY_DOWN) == GLFW_PRESS) {
         cam_pos.z -= camera_speed;
@@ -167,11 +168,11 @@ void updateCameraPosKeyboard() {
         }
     }
 
-    if(glfwGetKey(GLFW_KEY_LEFT) == GLFW_PRESS) {
-        leftEventActive = true;
+    if(glfwGetKey(GLFW_KEY_RIGHT) == GLFW_PRESS) {
+        rightEventActive = true;
     }
     else {
-        if (leftEventActive) {
+        if (rightEventActive) {
             v->changeFile(true);
             fillPoints(v);
             glBindBuffer (GL_ARRAY_BUFFER, vbo_vertex);
@@ -181,8 +182,30 @@ void updateCameraPosKeyboard() {
             glBindBuffer (GL_ARRAY_BUFFER, vbo_normal);
             glBufferData (GL_ARRAY_BUFFER, vnormals.size() * sizeof (GLfloat), &vnormals[0], GL_DYNAMIC_DRAW);
 
+            rightEventActive = false;
+
         }
     }
+
+    if(glfwGetKey(GLFW_KEY_LEFT) == GLFW_PRESS) {
+        leftEventActive = true;
+    }
+    else {
+        if (leftEventActive) {
+            v->changeFile(false);
+            fillPoints(v);
+            glBindBuffer (GL_ARRAY_BUFFER, vbo_vertex);
+            glBufferData (GL_ARRAY_BUFFER, points.size() * sizeof (GLfloat), &points[0], GL_DYNAMIC_DRAW);
+            glBindBuffer (GL_ARRAY_BUFFER, vbo_color);
+            glBufferData (GL_ARRAY_BUFFER, color.size() * sizeof (GLfloat), &color[0], GL_DYNAMIC_DRAW);
+            glBindBuffer (GL_ARRAY_BUFFER, vbo_normal);
+            glBufferData (GL_ARRAY_BUFFER, vnormals.size() * sizeof (GLfloat), &vnormals[0], GL_DYNAMIC_DRAW);
+
+            leftEventActive = false;
+
+        }
+    }
+
 
 }
 
@@ -313,7 +336,7 @@ int main(int argc, char *argv[]) {
     glBufferData (GL_ARRAY_BUFFER, vnormals.size() * sizeof (GLfloat), &vnormals[0], GL_DYNAMIC_DRAW);
 
 
-    unsigned int vao = 0;
+    vao = 0;
     glGenVertexArrays (1, &vao);
     glBindVertexArray (vao);
 
