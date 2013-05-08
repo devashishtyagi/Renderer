@@ -11,6 +11,7 @@
 
 #define IMAGEFILE "Data/image.dat"
 #define WEATHERMAPFILE "Data/weather.dat"
+#define MAXCOLORMODELS 2
 
 struct Vertex
 {
@@ -95,24 +96,26 @@ typedef struct Triangle triangle;
 class InitializeData
     {
 private:
+        // List of the files
         std::vector< std::string > VoxelFiles;
-        double runningAlpha;
         // This would indicate whether sides would be rendered or not
         bool sides;
-        // We will number the different color model and change them on a c click
+        // We will number the different color model and change them on a click
+        /* Number of color models
+         1 --> different colors for different regions
+         2 --> compressed color range
+        */
         int colorModel;
+        // index of the current file being rendered
         int currentFile;
         std::vector< std::vector< std::vector<int> > > imageStore;
         std::vector< std::vector<double> > weatherDegree;
         std::map< double, std::pair< int, std::pair<int,int> > > colormap;
-        std::vector<int> boundaryVoxelList;
         void buildMap(const char* imageFile, const char* weatherMapFile);
-        void readPoints(const char* fileName);
         void split(std::string data, std::vector<std::string> points);
         void triPush(std::string p1, std::string p2, std::string p3, std::pair<int,float> vd, bool visible);
         void impartColor();
         void formTriangles(const char* fileName);
-		void populateBoundaryVoxels (const char* fileName);
         double convertDouble(std::string str);
         void calculateNormals();
         std::vector<int> colorMap(float corval);
@@ -126,7 +129,6 @@ private:
         void initializeData(std::vector< std::string > files);
         std::unordered_map<std::string,vertex> map;
         std::vector<triangle> Triangles;
-        std::vector<normal> VNormals;
 
     };
 

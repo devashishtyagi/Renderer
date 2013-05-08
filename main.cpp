@@ -77,6 +77,9 @@ string textFileRead (const char* fileName) {
 void fillPoints(InitializeData *v)
 {
     points.clear();
+    color.clear();
+    vnormals.clear();
+
     for(int i = 0;i < (int)v->Triangles.size();i++)
     {
         if (v->Triangles[i].isVisible)
@@ -126,6 +129,30 @@ void fillPoints(InitializeData *v)
     }
 }
 
+void fillColor() {
+
+    color.clear();  
+    for(int i = 0;i < (int)v->Triangles.size();i++)
+    {
+        if (v->Triangles[i].isVisible)
+        {
+            // 1st vertex
+            color.push_back(v->Triangles[i].first->r);
+            color.push_back(v->Triangles[i].first->g);
+            color.push_back(v->Triangles[i].first->b);
+            // 2nd vertex
+            color.push_back(v->Triangles[i].second->r);
+            color.push_back(v->Triangles[i].second->g);
+            color.push_back(v->Triangles[i].second->b);
+            // 3rd vertex
+            color.push_back(v->Triangles[i].third->r);
+            color.push_back(v->Triangles[i].third->g);
+            color.push_back(v->Triangles[i].third->b);
+        }
+    }
+}
+
+
 void buildView() {
     view_mat = glm::lookAt(cam_pos, glm::vec3(0.0, 0.0, 0.0), glm::vec3(0.0, 1.0, 0.0));
 }
@@ -144,6 +171,7 @@ void updateCameraPosKeyboard() {
     static bool tabEventActive = false;
     static bool leftEventActive = false;
     static bool rightEventActive = false;
+    static bool spaceEventActive = false;
 
     if (glfwGetKey(GLFW_KEY_DOWN) == GLFW_PRESS) {
         cam_pos.z -= camera_speed;
@@ -205,6 +233,20 @@ void updateCameraPosKeyboard() {
 
         }
     }
+    if (glfwGetKey(GLFW_KEY_SPACE) == GLFW_PRESS) {
+        spaceEventActive = true;
+    }
+    else  {
+        if(spaceEventActive) {
+            v->changeColorModel();
+            fillColor();
+            glBindBuffer (GL_ARRAY_BUFFER, vbo_color);
+            glBufferData (GL_ARRAY_BUFFER, color.size() * sizeof (GLfloat), &color[0], GL_DYNAMIC_DRAW);
+            
+            spaceEventActive = false;            
+        }
+    }
+
 
 
 }

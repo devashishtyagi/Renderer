@@ -22,8 +22,6 @@ using namespace std;
 unsigned long long universalTid;
 
 // DEBUG VARIABLE
-float MAXWEATHER = 0.0;
-int greaterCount = 0;
 
 double InitializeData::convertDouble(string str) {
     double ans;
@@ -75,104 +73,7 @@ void InitializeData::buildMap(const char *imageFile, const char *weatherMapFile)
     wmfile.close();
 }
 
-//Do all in one read of the data file -- for faster work
 
-void InitializeData::populateBoundaryVoxels (const char* fileName) {
-	ifstream myfile (fileName);
-    string data;
-    if (myfile.is_open()) {
-        int index = 0;
-		int voxelID;
-		double weathingD;
-        while (myfile.good()) {
-            
-			getline (myfile, data);
-            if (index == 0) {
-				stringstream ss(data);
-				ss>>voxelID>>weathingD;
-            }
-			else if (index == 9) {
-				
-				stringstream ss(data);
-                string a[6];
-                int b[6],c[6];
-                ss>>a[0]>>b[0]>>c[0]>>a[1]>>b[1]>>c[1]>>a[2]>>b[2]>>c[2]>>a[3]>>b[3]>>c[3]>>a[4]>>b[4]>>c[4]>>a[5]>>b[5]>>c[5];
-				
-                //front face -- 0
-                bool visible = false;
-                if(b[0] == -1)
-                    visible = true;
-				
-                // right face -- 1
-                if(b[1] == -1)
-                    visible = true;
-				
-                //back face -- 2
-                if(b[2] == -1)
-                    visible = true;
-				
-                //left face -- 3
-                if(b[3] == -1)
-                    visible = true;
-				
-                // top face -- 4
-                if(b[4] == -1)
-                    visible = true;
-				
-                //bottom face -- 5
-                if(b[5] == -1)
-                    visible = true;
-				
-				if(visible)
-                    boundaryVoxelList.push_back(voxelID);
-			}
-			
-            index = (index+1)%10;
-        }
-		
-    }
-	
-}
-
-// only those points which are a part of the visible voxels
-
-void InitializeData::readPoints(const char* fileName) {
-    ifstream myfile (fileName);
-    vector<double> points(3);
-    string data;
-	int voxelID;
-	double weathingD;
-	
-    if (myfile.is_open()) {
-        int index = 0;
-        bool insert = true;
-        while (myfile.good()) {
-            getline (myfile, data);
-			if(index == 0) {
-                insert = true;
-				stringstream ss(data);
-				ss>>voxelID>>weathingD;
-                if (find(boundaryVoxelList.begin(),boundaryVoxelList.end(), voxelID) == boundaryVoxelList.end())
-                    insert = false;
-			}
-			
-            if (index >= 1 && index <= 8 && insert)
-            {
-                unordered_map<string,vertex>::const_iterator got = map.find (data);
-                if ( got == map.end() ) // new vertex
-                {
-                    stringstream ss(data);
-                    ss>>points[0]>>points[1]>>points[2];
-                    vertex m(points[0],points[1],points[2]);
-                    map[data] = m;
-                }
-            }
-			
-            index = (index+1)%10;
-        }
-		
-    }
-}
 
 void InitializeData::split(string data, vector<string> points) {
     stringstream ss(data);
@@ -477,19 +378,20 @@ void InitializeData::impartColor()
         it->second.b = (double)(w1*(low->second.second.second) + (1.0-w1)*(up->second.second.second))/255.0;
         */
 
+        if(colorModel == 2)
+        {
+            it->second.r = 0.2 + 0.4*(1.0-val);
+            it->second.g = 0.2 + 0.4*(1.0-val);
+            it->second.b = 0.2 + 0.4*(1.0-val);
+        }
 
-//       it->second.r = 0.2 + 0.4*(1.0-val);
-//        it->second.g = 0.2 + 0.4*(1.0-val);
-//        it->second.b = 0.2 + 0.4*(1.0-val);
-//        it->second.r = (1.0-val);
-//        it->second.g = (1.0-val);
-//        it->second.b = (1.0-val);
-
-        vector<int> rgb = colorMap(val);
-        it->second.r = 1.0*rgb[0]/255.0;
-        it->second.g = 1.0*rgb[1]/255.0;
-        it->second.b = 1.0*rgb[2]/255.0;
-
+        if(colorModel == 1)
+        {
+            vector<int> rgb = colorMap(val);
+            it->second.r = 1.0*rgb[0]/255.0;
+            it->second.g = 1.0*rgb[1]/255.0;
+            it->second.b = 1.0*rgb[2]/255.0;
+        }
 
     }
 }
@@ -680,7 +582,14 @@ void InitializeData::Calculate() {
 }
 
 void InitializeData::changeColorModel() {
-    
+    if (colorModel < MAXCOLORMODELS)
+        colorModel++;
+    else
+        colorModel = (colorModel+1)%MAXCOLORMODELS;
+    // We only need to change the color here
+    impartColor();
+    cout<<"Color Imparted"<<endl;
+
 }
 
 void InitializeData::changeSides() {
