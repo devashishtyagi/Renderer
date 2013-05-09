@@ -11,7 +11,7 @@
 
 #define IMAGEFILE "Data/image.dat"
 #define WEATHERMAPFILE "Data/weather.dat"
-#define MAXCOLORMODELS 2
+#define MAXCOLORMODELS 4
 
 struct Vertex
 {

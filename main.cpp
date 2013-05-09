@@ -212,7 +212,6 @@ void updateCameraPosKeyboard() {
             glBufferData (GL_ARRAY_BUFFER, vnormals.size() * sizeof (GLfloat), &vnormals[0], GL_DYNAMIC_DRAW);
 
             rightEventActive = false;
-
         }
     }
 
@@ -231,7 +230,6 @@ void updateCameraPosKeyboard() {
             glBufferData (GL_ARRAY_BUFFER, vnormals.size() * sizeof (GLfloat), &vnormals[0], GL_DYNAMIC_DRAW);
 
             leftEventActive = false;
-
         }
     }
     if (glfwGetKey(GLFW_KEY_SPACE) == GLFW_PRESS) {
@@ -247,6 +245,7 @@ void updateCameraPosKeyboard() {
             spaceEventActive = false;            
         }
     }
+
     if (glfwGetKey(GLFW_KEY_HOME) == GLFW_PRESS) {
         homeEventActive = true;
     }
@@ -261,13 +260,9 @@ void updateCameraPosKeyboard() {
             glBindBuffer (GL_ARRAY_BUFFER, vbo_normal);
             glBufferData (GL_ARRAY_BUFFER, vnormals.size() * sizeof (GLfloat), &vnormals[0], GL_DYNAMIC_DRAW);
 
-
             homeEventActive = false;
         }
     }
-
-
-
 }
 
 void GLFWCALL updateCameraPosMouse(int x, int y) {
@@ -298,13 +293,12 @@ void GLFWCALL updateCameraPosMouse(int x, int y) {
 		V1 = glm::normalize(V1);
 		V2 = glm::normalize(V2);
         glm::vec3 N = glm::cross(V2, V1);
-        //float angle = acos(min(1.0f, glm::dot(V2, V1)));
-        float angle = glm::angle(V2, V1);
+        float angle = acos(min(1.0f, glm::dot(V2, V1)));
         if (isnan(angle)) {
 			return;
 		}
 
-        model_mat = glm::rotate(model_mat, angle, N);
+        model_mat = glm::rotate(model_mat, (float)(angle*180.0/M_PI), N);
 	}
 
     V2 = V1;
@@ -414,7 +408,7 @@ int main(int argc, char *argv[]) {
     glEnableVertexAttribArray (2);
 
     std::string vertex_shader = textFileRead ("vs.glsl");
-    std::string fragment_shader = textFileRead ("fs.glsl");
+    std::string fragment_shader = textFileRead ("huefs.glsl");
 
     GLuint vs = glCreateShader (GL_VERTEX_SHADER);
     GLuint fs = glCreateShader (GL_FRAGMENT_SHADER);

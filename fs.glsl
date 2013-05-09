@@ -27,8 +27,8 @@ void main () {
     vec3 direction_to_light_eye = normalize(distance_to_light_eye);
     vec3 norm_normal_eye = normalize(normal_eye);
     float dot_prod = max(dot(direction_to_light_eye, norm_normal_eye), 0.0);
-    vec3 ld = Ld*Kd*dot_prod; // final diffuse intensity
-    //vec3 ld = colour*dot_prod;
+    //vec3 ld = Ld*Kd*dot_prod; // final diffuse intensity
+    vec3 ld = colour*dot_prod;
 
     //specualr intensity
     vec3 reflection_eye = reflect(-direction_to_light_eye, normal_eye);
@@ -39,5 +39,5 @@ void main () {
     vec3 ls = Ls*Ks*specular_factor;
 
     float t = 1.0;
-    frag_colour = vec4 ((ld)*colour, 1.0);
+    frag_colour = vec4 (ld, 1.0);
 }

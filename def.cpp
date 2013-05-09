@@ -350,41 +350,6 @@ void InitializeData::impartColor()
 		
         it->second.avgCorrosionLevel = val;
 
-        /*
-        auto low = colormap.begin();
-        it->second.r = (double)((low->second.first))/255.0;
-        it->second.g = (double)((low->second.second.first))/255.0;
-        it->second.b = (double)((low->second.second.second))/255.0;
-        */
-
-        /*
-        auto pos = findClose(colormap, val);
-        auto low = pos;
-        */
-        /*
-        auto up = ++pos;
-        if (up == colormap.end())
-            up = low;
-        */
-        /*
-        auto up = --pos;
-
-
-        double w1 = (val - up->first)/(low->first - up->first);
-        if (!(w1 >= 0.0 && w1 <= 1.0))
-            w1 = 1.0;
-        it->second.r = (double)(w1*(low->second.first) + (1.0-w1)*(up->second.first))/255.0;
-        it->second.g = (double)(w1*(low->second.second.first) + (1.0-w1)*(up->second.second.first))/255.0;
-        it->second.b = (double)(w1*(low->second.second.second) + (1.0-w1)*(up->second.second.second))/255.0;
-        */
-
-        if(colorModel == 2)
-        {
-            it->second.r = 0.2 + 0.4*(1.0-val);
-            it->second.g = 0.2 + 0.4*(1.0-val);
-            it->second.b = 0.2 + 0.4*(1.0-val);
-        }
-
         if(colorModel == 1)
         {
             vector<int> rgb = colorMap(val);
@@ -392,7 +357,28 @@ void InitializeData::impartColor()
             it->second.g = 1.0*rgb[1]/255.0;
             it->second.b = 1.0*rgb[2]/255.0;
         }
-
+        else if(colorModel == 2)
+        {
+            it->second.r = 0.2 + 0.4*(1.0-val);
+            it->second.g = 0.2 + 0.4*(1.0-val);
+            it->second.b = 0.2 + 0.4*(1.0-val);
+        }
+        else if (colorModel == 3) {
+            it->second.r = 0.1 + 0.8*(1.0-val);
+            it->second.g = 0.1 + 0.8*(1.0-val);
+            it->second.b = 0.1 + 0.8*(1.0-val);
+        }
+        else if (colorModel == 4) {
+            auto pos = findClose(colormap, val);
+            auto low = pos;
+            auto up = --pos;
+            double w1 = (val - up->first)/(low->first - up->first);
+            if (!(w1 >= 0.0 && w1 <= 1.0))
+                w1 = 1.0;
+            it->second.r = (double)(w1*(low->second.first) + (1.0-w1)*(up->second.first))/255.0;
+            it->second.g = (double)(w1*(low->second.second.first) + (1.0-w1)*(up->second.second.first))/255.0;
+            it->second.b = (double)(w1*(low->second.second.second) + (1.0-w1)*(up->second.second.second))/255.0;
+        }
     }
 }
 
