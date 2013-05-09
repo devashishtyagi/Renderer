@@ -1,6 +1,7 @@
 #version 420
 
 in vec3 colour, position_eye, normal_eye;
+in float depth;
 out vec4 frag_colour;
 uniform mat4 view, proj, model, orig_model_mat;
 
@@ -251,7 +252,7 @@ void main() {
     float dot_prod = max(dot(direction_to_light_eye, norm_normal_eye), 0.0);
 
     vec3 hslColor = RGBToHSL(colour);
-    hslColor.r = hslColor.r*dot_prod;
+    hslColor.b = 0.4*dot_prod;
 
     frag_colour = vec4(HSLToRGB(hslColor), 1.0);
 }

@@ -39,6 +39,13 @@ float fov = 45.0f;
 // Initialize Data Object
 InitializeData *v;
 
+// Shader programs
+GLuint shader_program[4];
+int currentProgram = 1;
+vector<string> fsprograms = 
+	{"fs.glsl", "huefs.glsl", "l_shading_fs.glsl", "sl_shading_fs.glsl"};
+unsigned int view_mat_location[4], proj_mat_location[4], model_mat_location[4], orig_model_mat_location[4];
+
 // VBO data objects
 unsigned int vbo_vertex, vbo_color, vbo_normal,vao;
 
@@ -167,18 +174,62 @@ void buildModel() {
     model_mat = glm::translate(glm::mat4(1.0f), glm::vec3(new_position, 0.0, 0.0));
 }
 
+void useShaderProgram() {
+	glUseProgram(shader_program[currentProgram]);
+
+    glUniformMatrix4fv (view_mat_location[currentProgram], 1, GL_FALSE, &view_mat[0][0]);
+    glUniformMatrix4fv (proj_mat_location[currentProgram], 1, GL_FALSE, &proj_mat[0][0]);
+    glUniformMatrix4fv (model_mat_location[currentProgram], 1, GL_FALSE, &model_mat[0][0]);
+    glUniformMatrix4fv (orig_model_mat_location[currentProgram], 1, GL_FALSE, &model_mat[0][0]);
+}
+
+void createShaderPrograms() {
+	std::string vertex_shader = textFileRead ("vs.glsl");
+	GLuint vs = glCreateShader (GL_VERTEX_SHADER);
+	const char* str = vertex_shader.c_str();
+    glShaderSource (vs, 1, &str, NULL);
+    glCompileShader (vs);
+    int params = -1;
+    glGetShaderiv(vs,GL_COMPILE_STATUS,&params);
+    checkError(params,"Vertex Shader not compiled");
+
+    for(int i = 0; i < (int)fsprograms.size(); i++) {
+    	shader_program[i] = glCreateProgram();
+	    
+	    std::string fragment_shader = textFileRead (fsprograms[i].c_str());
+	    GLuint fs = glCreateShader (GL_FRAGMENT_SHADER);
+	    const char* strb = fragment_shader.c_str();
+	    glShaderSource (fs, 1, &strb, NULL);
+	    glCompileShader (fs);
+	    params = -1;
+	    glGetShaderiv(fs,GL_COMPILE_STATUS,&params);
+	    checkError(params,"Fragment Shader not compiled");
+
+	    glAttachShader(shader_program[i],vs);
+	    glAttachShader(shader_program[i],fs);
+	    glLinkProgram (shader_program[i]);
+
+    	glUseProgram(shader_program[i]);
+    	view_mat_location[i] = glGetUniformLocation (shader_program[currentProgram], "view");
+    	proj_mat_location[i] = glGetUniformLocation (shader_program[currentProgram], "proj");
+    	model_mat_location[i] = glGetUniformLocation (shader_program[currentProgram], "model");
+    	orig_model_mat_location[i] = glGetUniformLocation (shader_program[currentProgram], "orig_model_mat");
+	}
+}
+
 void updateCameraPosKeyboard() {
     static bool tabEventActive = false;
     static bool leftEventActive = false;
     static bool rightEventActive = false;
     static bool spaceEventActive = false;
     static bool homeEventActive = false;
+    static bool shiftEventActive = false;
 
     if (glfwGetKey(GLFW_KEY_DOWN) == GLFW_PRESS) {
-        cam_pos.z -= camera_speed;
+        cam_pos.z += camera_speed;
     }
     if (glfwGetKey(GLFW_KEY_UP) == GLFW_PRESS) {
-        cam_pos.z += camera_speed;
+        cam_pos.z -= camera_speed;
     }
 
     if (glfwGetKey(GLFW_KEY_TAB) == GLFW_PRESS)
@@ -241,7 +292,6 @@ void updateCameraPosKeyboard() {
             fillColor();
             glBindBuffer (GL_ARRAY_BUFFER, vbo_color);
             glBufferData (GL_ARRAY_BUFFER, color.size() * sizeof (GLfloat), &color[0], GL_DYNAMIC_DRAW);
-            
             spaceEventActive = false;            
         }
     }
@@ -263,6 +313,18 @@ void updateCameraPosKeyboard() {
             homeEventActive = false;
         }
     }
+
+    if (glfwGetKey(GLFW_KEY_LSHIFT) == GLFW_PRESS)
+    {
+        shiftEventActive = true;
+    }
+    else {
+        if (shiftEventActive) {
+        	currentProgram = (currentProgram+1)%4;
+        	useShaderProgram();
+            shiftEventActive = false;
+        }
+    }
 }
 
 void GLFWCALL updateCameraPosMouse(int x, int y) {
@@ -271,11 +333,11 @@ void GLFWCALL updateCameraPosMouse(int x, int y) {
     glm::vec3 V1((double)x, (double)y, 0.0);
     V1[0] = V1[0]/((double) window_width/2.0) - 1.0;
     V1[1] = 1.0 - V1[1]/((double) window_height/2.0);
-    if (pow(V1[0], 2) + pow(V1[0], 2) < 1.0) {
+    if (pow(V1[0], 2) + pow(V1[0], 2) < 0.5) {
         V1[2] = sqrt(1.0 - pow(V1[0], 2) + pow(V1[1], 2));
     }
     else {
-        V1 = glm::normalize(V1);
+        V1[2] = 0.5/sqrt(pow(V1[0], 2) + pow(V1[1], 2));
     }
 
 	bool performRotation = true;
@@ -297,7 +359,6 @@ void GLFWCALL updateCameraPosMouse(int x, int y) {
         if (isnan(angle)) {
 			return;
 		}
-
         model_mat = glm::rotate(model_mat, (float)(angle*180.0/M_PI), N);
 	}
 
@@ -407,35 +468,8 @@ int main(int argc, char *argv[]) {
     glEnableVertexAttribArray (1);
     glEnableVertexAttribArray (2);
 
-    std::string vertex_shader = textFileRead ("vs.glsl");
-    std::string fragment_shader = textFileRead ("huefs.glsl");
-
-    GLuint vs = glCreateShader (GL_VERTEX_SHADER);
-    GLuint fs = glCreateShader (GL_FRAGMENT_SHADER);
-    GLuint shader_program = glCreateProgram ();
-
-    glAttachShader(shader_program,vs);
-    glAttachShader(shader_program,fs);
-
-    const char* str = vertex_shader.c_str();
-    glShaderSource (vs, 1, &str, NULL);
-
-    const char* strb = fragment_shader.c_str();
-    glShaderSource (fs, 1, &strb, NULL);
-
-    glCompileShader (vs);
-    glCompileShader (fs);
-
-    int params = -1;
-    glGetShaderiv(vs,GL_COMPILE_STATUS,&params);
-    checkError(params,"Vertex Shader not compiled");
-
-    params = -1;
-
-    glGetShaderiv(fs,GL_COMPILE_STATUS,&params);
-    checkError(params,"Fragment Shader not compiled");
-
-    glLinkProgram (shader_program);
+    createShaderPrograms();
+    useShaderProgram();
 
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LEQUAL);
@@ -444,17 +478,6 @@ int main(int argc, char *argv[]) {
     buildProj();
     buildModel();
     bool running = true;
-
-    glUseProgram(shader_program);
-    unsigned int view_mat_location = glGetUniformLocation (shader_program, "view");
-    unsigned int proj_mat_location = glGetUniformLocation (shader_program, "proj");
-    unsigned int model_mat_location = glGetUniformLocation (shader_program, "model");
-    unsigned int orig_model_mat_location = glGetUniformLocation (shader_program, "orig_model_mat");
-
-    glUniformMatrix4fv (view_mat_location, 1, GL_FALSE, &view_mat[0][0]);
-    glUniformMatrix4fv (proj_mat_location, 1, GL_FALSE, &proj_mat[0][0]);
-    glUniformMatrix4fv (model_mat_location, 1, GL_FALSE, &model_mat[0][0]);
-    glUniformMatrix4fv (orig_model_mat_location, 1, GL_FALSE, &model_mat[0][0]);
 
     draw_mode = GL_TRIANGLES;
 
@@ -466,8 +489,8 @@ int main(int argc, char *argv[]) {
         updateCameraPosKeyboard();
 
         buildView();
-        glUniformMatrix4fv (view_mat_location, 1, GL_FALSE, &view_mat[0][0]);
-        glUniformMatrix4fv (model_mat_location, 1, GL_FALSE, &model_mat[0][0]);
+        glUniformMatrix4fv (view_mat_location[currentProgram], 1, GL_FALSE, &view_mat[0][0]);
+        glUniformMatrix4fv (model_mat_location[currentProgram], 1, GL_FALSE, &model_mat[0][0]);
 
         glBindVertexArray (vao);
         glDrawArrays (draw_mode, 0, (GLint)points.size()/3);
