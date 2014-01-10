@@ -11,8 +11,9 @@ uniform mat4 view, proj, model, orig_model_mat;
 
 void main () {
     colour = vertex_colour;
+    vec3 vertex_nrml = normalize(vertex_normal);
     position_eye = vec3(view*model*vec4(vertex_position, 1.0));
-    normal_eye = vec3(view*model*vec4(vertex_normal, 0.0));
-    gl_Position = proj * view * model * vec4 (vertex_position + displace*vertex_normal, 1.0);
+    normal_eye = vec3(view*model*vec4(vertex_nrml, 0.0));
+    gl_Position = proj * view * model * vec4 (vertex_position, 1.0);
     depth = abs(gl_Position.z);
 }

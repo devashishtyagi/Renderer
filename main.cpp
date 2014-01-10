@@ -28,7 +28,7 @@ vector< vector<GLfloat> > heightMap;
 GLenum draw_mode;
 
 // View parameters
-glm::vec3 cam_pos(0.0, 0.0, 50.0);
+glm::vec3 cam_pos(0.0, 10.0, 30.0);
 float cam_yaw = 0.0f; // y-rotation in degrees
 glm::mat4 view_mat = glm::mat4();
 glm::mat4 proj_mat = glm::mat4();
@@ -39,17 +39,16 @@ float camera_speed = 0.1f;
 
 // Projection parameters
 float near = 0.1f;  // near clipping plane
-float far = 400.0f; // far clipping plane
-float fov = 90.0f;
+float far = 40.0f; // far clipping plane
+float fov = 75.0f;
 
 // Initialize Data Object
 InitializeData *v;
 
 // Shader programs
 GLuint shader_program[4];
-int currentProgram = 1;
-vector<string> fsprograms = 
-	{"fs.glsl", "huefs.glsl", "l_shading_fs.glsl", "sl_shading_fs.glsl"};
+int currentProgram = 0;
+vector<string> fsprograms = {"fs.glsl"};
 unsigned int view_mat_location[4], proj_mat_location[4], model_mat_location[4], orig_model_mat_location[4];
 
 // VBO data objects
@@ -444,8 +443,7 @@ void readHeightMapRGB(string filename) {
       ifstream myfile (filename);
       if (myfile.is_open())
       {
-          int cnt = 0;
-          int i = 0;
+      	int cnt = 0;  
         while ( getline (myfile,line) )
         {
          
@@ -454,9 +452,8 @@ void readHeightMapRGB(string filename) {
          if(cnt > 1)
          {
             int v = 0;
-            int cnt = 0;
             vector<int> val;
-            for(int i=0;i<line.size();i++){
+            for(int i = 0; i < (int)line.size(); i++){
             if(val.size() == 5)
                 break;
             int r = line[i]-'0';
@@ -475,13 +472,9 @@ void readHeightMapRGB(string filename) {
            }
         }
         myfile.close();
-        /*for(int i=0;i<512;i++){
-        for(int j=0;j<512;j++)
-            cout<<height_map[i][j].first<<" "<<height_map[i][j].second.first<<" "<<height_map[i][j].second.second<<endl;
-        }*/
       }
-
-      else cout << "Unable to open file"; 
+      else 
+      	cout << "Unable to open file"<<endl; 
 
 } 
 
@@ -501,7 +494,7 @@ int main(int argc, char *argv[]) {
 
     fillPoints(v);*/
 
-    string inputfile = "bound_aligned_meshllab.obj";
+    string inputfile = "test_teddy_param.obj";
     vector<tinyobj::shape_t> shapes;
   
     string errr = tinyobj::LoadObj(shapes, inputfile.c_str());
@@ -512,7 +505,7 @@ int main(int argc, char *argv[]) {
     }
 
     //readHeightMap("Data/mountain.txt");
-    readHeightMapRGB("Data/terrain1-png.txt");
+    readHeightMapRGB("Data/terrain.txt");
     float maxR = 0.0;
     for(int i = 0; i < (int)shapes[0].mesh.indices.size()/3; i++) {
         for(int j = 0; j < 3; j++) {
@@ -536,7 +529,7 @@ int main(int argc, char *argv[]) {
     std::default_random_engine generator;
     std::uniform_int_distribution<int> distribution(1,10);
     
-    cout<<"Start"<<endl;
+    cout<<"Start Generating Texture Coordinates"<<endl;
 
     for(int i = 0; i < (int)points.size()/3; i++) {
         int idx = i;
@@ -552,22 +545,19 @@ int main(int argc, char *argv[]) {
         int y = trunc(theta*(h_height-1));
         x = max(0, min(x, h_width-1));
         y = max(0, min(y, h_height-1));
-        if (x < 0 && x > 255)
-            cout<<r<<endl;
-        if (y < 0 && y > 255)
-            cout<<theta<<endl;
+        
         texCordinates.push_back(heightMap[x][y]);
         //texCordinates.push_back((float)distribution(generator)/50.0);
     }
 
-    cout<<"I am done"<<endl;
+    cout<<"Done Generating Texture Coordinates"<<endl;
 
     color.resize(points.size(), 0);
 
     for(int i = 0; i < (int)points.size()/3; i++) { 
-        color[i*3] = 0.7;
-        color[i*3+1] = 0.6;
-        color[i*3+2] = 0.1;
+        color[i*3] = 1.0;
+        color[i*3+1] = 0.0;
+        color[i*3+2] = 0.0;
     }
 
 
@@ -658,7 +648,6 @@ int main(int argc, char *argv[]) {
         glDrawArrays (draw_mode, 0, (GLint)points.size()/3);
         glfwSwapBuffers();
         running = !glfwGetKey(GLFW_KEY_ESC) && glfwGetWindowParam (GLFW_OPENED);
-        //glBindVertexArray(0);
     }
 
     // close GL context and any other GLFW resources
