@@ -1,7 +1,7 @@
-FILES = Data/stochastic_model_level_0000100.txt Data/stochastic_model_level_0000200.txt Data/stochastic_model_level_0000300.txt Data/stochastic_model_level_0000400.txt Data/stochastic_model_level_0000500.txt Data/stochastic_model_level_0000600.txt Data/stochastic_model_level_0000700.txt Data/stochastic_model_level_0000800.txt Data/stochastic_model_level_0000900.txt
+FILES = example1.txt
 
 all:
-	g++ -Wall -std=c++0x main.cpp def.cpp maths_funcs.cpp -o main -lGLEW -lglfw -lGLU -lGL -lm
+	g++ -Wall -std=c++0x main.cpp def.cpp maths_funcs.cpp tinyobjloader/tiny_obj_loader.cpp -o main -lGLEW -lglfw -lGLU -lGL -lm
 run:
 	./main $(FILES)
 run-nvidia:

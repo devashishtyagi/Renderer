@@ -5,7 +5,7 @@ out vec4 frag_colour;
 uniform mat4 view, proj, model, orig_model_mat;
 
 // virtual lighting source
-vec3 light_position_world = vec3(0.0, 0.0, 7.0);
+vec3 light_position_world = vec3(0.0, 0.0, 100.0);
 vec3 Ls = vec3(0.7, 0.7, 0.7);
 vec3 Ld = vec3(1.0, 1.0, 1.0);
 vec3 La = vec3(0.2, 0.2, 0.2);
@@ -40,4 +40,5 @@ void main () {
 
     float t = 1.0;
     frag_colour = vec4 (ld, 1.0);
+    //frag_colour = vec4(0.7, 0.6, 0.1, 1.0);
 }

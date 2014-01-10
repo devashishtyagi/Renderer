@@ -8,21 +8,27 @@
 
 #include "draw.h"
 #include "def.h"
+#include "tinyobjloader/tiny_obj_loader.h"
+#include <random>
 
 #define ONE_DEG_IN_RAD (2.0 * M_PI) / 360.0 // 0.017444444
 
 using namespace std;
 
 int window_width = 800, window_height = 600;
+int h_height = 512, h_width = 512;
 
 vector<GLfloat> points;
 vector<GLfloat> color;
 vector<GLfloat> vnormals;
+vector<GLfloat> texCordinates;
+
+vector< vector<GLfloat> > heightMap;
 
 GLenum draw_mode;
 
 // View parameters
-glm::vec3 cam_pos(0.0, 0.0, 2.0);
+glm::vec3 cam_pos(0.0, 0.0, 50.0);
 float cam_yaw = 0.0f; // y-rotation in degrees
 glm::mat4 view_mat = glm::mat4();
 glm::mat4 proj_mat = glm::mat4();
@@ -33,8 +39,8 @@ float camera_speed = 0.1f;
 
 // Projection parameters
 float near = 0.1f;  // near clipping plane
-float far = 100.0f; // far clipping plane
-float fov = 45.0f;
+float far = 400.0f; // far clipping plane
+float fov = 90.0f;
 
 // Initialize Data Object
 InitializeData *v;
@@ -47,7 +53,7 @@ vector<string> fsprograms =
 unsigned int view_mat_location[4], proj_mat_location[4], model_mat_location[4], orig_model_mat_location[4];
 
 // VBO data objects
-unsigned int vbo_vertex, vbo_color, vbo_normal,vao;
+unsigned int vbo_vertex, vbo_color, vbo_normal, vbo_tex, vao;
 
 static void checkError(GLint status, const char *msg)
 {
@@ -261,6 +267,8 @@ void updateCameraPosKeyboard() {
             glBufferData (GL_ARRAY_BUFFER, color.size() * sizeof (GLfloat), &color[0], GL_DYNAMIC_DRAW);
             glBindBuffer (GL_ARRAY_BUFFER, vbo_normal);
             glBufferData (GL_ARRAY_BUFFER, vnormals.size() * sizeof (GLfloat), &vnormals[0], GL_DYNAMIC_DRAW);
+            glBindBuffer (GL_ARRAY_BUFFER, vbo_tex);
+            glBufferData (GL_ARRAY_BUFFER, texCordinates.size() * sizeof (GLfloat), &texCordinates[0], GL_DYNAMIC_DRAW);
 
             rightEventActive = false;
         }
@@ -279,6 +287,9 @@ void updateCameraPosKeyboard() {
             glBufferData (GL_ARRAY_BUFFER, color.size() * sizeof (GLfloat), &color[0], GL_DYNAMIC_DRAW);
             glBindBuffer (GL_ARRAY_BUFFER, vbo_normal);
             glBufferData (GL_ARRAY_BUFFER, vnormals.size() * sizeof (GLfloat), &vnormals[0], GL_DYNAMIC_DRAW);
+            glBindBuffer (GL_ARRAY_BUFFER, vbo_tex);
+            glBufferData (GL_ARRAY_BUFFER, texCordinates.size() * sizeof (GLfloat), &texCordinates[0], GL_DYNAMIC_DRAW);
+
 
             leftEventActive = false;
         }
@@ -309,6 +320,9 @@ void updateCameraPosKeyboard() {
             glBufferData (GL_ARRAY_BUFFER, color.size() * sizeof (GLfloat), &color[0], GL_DYNAMIC_DRAW);
             glBindBuffer (GL_ARRAY_BUFFER, vbo_normal);
             glBufferData (GL_ARRAY_BUFFER, vnormals.size() * sizeof (GLfloat), &vnormals[0], GL_DYNAMIC_DRAW);
+            glBindBuffer (GL_ARRAY_BUFFER, vbo_tex);
+            glBufferData (GL_ARRAY_BUFFER, texCordinates.size() * sizeof (GLfloat), &texCordinates[0], GL_DYNAMIC_DRAW);
+
 
             homeEventActive = false;
         }
@@ -399,9 +413,79 @@ void GLFWCALL resize(int width, int height) {
 	window_height = height;
 }
 
+void readHeightMap(string filename) {
+    int width = 256;
+    int height = 256;
+    heightMap.resize(width, vector<GLfloat>(height));
+
+    ifstream infile(filename);
+    if (infile.is_open()) {
+        string line;
+        for(int i = 0; i < width; i++) {
+            getline(infile, line);
+            stringstream ss(line);
+            for(int j = 0; j < height; j++) {
+                int h;
+                ss>>h;
+                heightMap[i][j] = (GLfloat)h/75.0;
+            }
+        }
+    }
+    else {
+        cout<<"Could not open the file"<<endl;
+    }
+}
+
+void readHeightMapRGB(string filename) {
+      string line;
+      vector<vector<pair<int,pair<int,int> > > > height_map(h_width,vector<pair<int,pair<int,int> > >(h_height));
+      heightMap.resize(h_width, vector<float>(h_height));
+
+      ifstream myfile (filename);
+      if (myfile.is_open())
+      {
+          int cnt = 0;
+          int i = 0;
+        while ( getline (myfile,line) )
+        {
+         
+         cnt ++;
+         
+         if(cnt > 1)
+         {
+            int v = 0;
+            int cnt = 0;
+            vector<int> val;
+            for(int i=0;i<line.size();i++){
+            if(val.size() == 5)
+                break;
+            int r = line[i]-'0';
+            if(r >=0 && r <= 9 )
+                v = v*10+r;
+            if(line[i] == ',' ||line[i] == ':')
+            {
+                val.push_back(v);
+                v = 0;
+            }
+               
+                
+            }
+            height_map[val[0]][val[1]] = make_pair(val[2],make_pair(val[3],val[4]));
+            heightMap[val[0]][val[1]] = (float)val[2]/255.0;
+           }
+        }
+        myfile.close();
+        /*for(int i=0;i<512;i++){
+        for(int j=0;j<512;j++)
+            cout<<height_map[i][j].first<<" "<<height_map[i][j].second.first<<" "<<height_map[i][j].second.second<<endl;
+        }*/
+      }
+
+      else cout << "Unable to open file"; 
+
+} 
+
 int main(int argc, char *argv[]) {
-
-
      if (!(argc >= 2)) {
         cerr << "The number of arguments is not appropriate - Terminating" << endl;
         return 1;
@@ -412,12 +496,82 @@ int main(int argc, char *argv[]) {
         a.push_back(argv[i]);
 
     //fill in the data
-    v = new InitializeData();
+/*    v = new InitializeData();
     v->initializeData(a);
 
-    fillPoints(v);
+    fillPoints(v);*/
 
-    cout<<"Number of triangles to be rendered "<<points.size()/9<<endl;
+    string inputfile = "bound_aligned_meshllab.obj";
+    vector<tinyobj::shape_t> shapes;
+  
+    string errr = tinyobj::LoadObj(shapes, inputfile.c_str());
+  
+    if (!errr.empty()) {
+      std::cerr << errr << std::endl;
+      exit(1);
+    }
+
+    //readHeightMap("Data/mountain.txt");
+    readHeightMapRGB("Data/terrain1-png.txt");
+    float maxR = 0.0;
+    for(int i = 0; i < (int)shapes[0].mesh.indices.size()/3; i++) {
+        for(int j = 0; j < 3; j++) {
+            int idx = shapes[0].mesh.indices[3*i+j];
+            points.push_back(shapes[0].mesh.positions[3*idx+0]);
+            points.push_back(shapes[0].mesh.positions[3*idx+1]);
+            points.push_back(shapes[0].mesh.positions[3*idx+2]);
+            vnormals.push_back(shapes[0].mesh.normals[3*idx+0]);
+            vnormals.push_back(shapes[0].mesh.normals[3*idx+1]);
+            vnormals.push_back(shapes[0].mesh.normals[3*idx+2]);
+            //int x = min(h_width-1, (int)(shapes[0].mesh.texcoords[2*idx+0]*(h_width-1)));
+            //int y = min(h_height-1, (int)(shapes[0].mesh.texcoords[2*idx+1]*(h_height-1)));
+            //texCordinates.push_back(heightMap[x][y]);
+            
+            float r = hypot(shapes[0].mesh.positions[3*idx+0], shapes[0].mesh.positions[3*idx+1]);
+            maxR = max(maxR, r);
+        }
+    }
+
+    double pi = 3.14159265;
+    std::default_random_engine generator;
+    std::uniform_int_distribution<int> distribution(1,10);
+    
+    cout<<"Start"<<endl;
+
+    for(int i = 0; i < (int)points.size()/3; i++) {
+        int idx = i;
+        float r = hypot(points[3*idx+0], points[3*idx+1]);
+        float theta = atan2(points[3*idx+1], points[3*idx+0]);
+        r = min(r/maxR, 1.0f);
+        theta = max(0.0, (theta+pi)/(2*pi));
+        
+        assert(r <= 1.0);
+        assert(theta <= 1.0);
+        
+        int x = trunc(r*(h_width-1));
+        int y = trunc(theta*(h_height-1));
+        x = max(0, min(x, h_width-1));
+        y = max(0, min(y, h_height-1));
+        if (x < 0 && x > 255)
+            cout<<r<<endl;
+        if (y < 0 && y > 255)
+            cout<<theta<<endl;
+        texCordinates.push_back(heightMap[x][y]);
+        //texCordinates.push_back((float)distribution(generator)/50.0);
+    }
+
+    cout<<"I am done"<<endl;
+
+    color.resize(points.size(), 0);
+
+    for(int i = 0; i < (int)points.size()/3; i++) { 
+        color[i*3] = 0.7;
+        color[i*3+1] = 0.6;
+        color[i*3+2] = 0.1;
+    }
+
+
+    cout<<"Number of triangles to be rendered "<<points.size()/9<<" "<<shapes[0].mesh.indices.size()/3<<endl;
 
     // start GL context and O/S window using GLFW helper library
     if (glfwInit() != GL_TRUE)
@@ -451,6 +605,11 @@ int main(int argc, char *argv[]) {
     glBindBuffer (GL_ARRAY_BUFFER, vbo_normal);
     glBufferData (GL_ARRAY_BUFFER, vnormals.size() * sizeof (GLfloat), &vnormals[0], GL_DYNAMIC_DRAW);
 
+    vbo_tex = 0;
+    glGenBuffers (1, &vbo_tex);
+    glBindBuffer (GL_ARRAY_BUFFER, vbo_tex);
+    glBufferData (GL_ARRAY_BUFFER, texCordinates.size() * sizeof (GLfloat), &texCordinates[0], GL_DYNAMIC_DRAW);    
+
 
     vao = 0;
     glGenVertexArrays (1, &vao);
@@ -462,11 +621,14 @@ int main(int argc, char *argv[]) {
     glVertexAttribPointer (1, 3, GL_FLOAT, GL_FALSE, 0, (GLubyte*) NULL);
     glBindBuffer (GL_ARRAY_BUFFER, vbo_normal);
     glVertexAttribPointer (2, 3, GL_FLOAT, GL_FALSE, 0, (GLubyte*) NULL);
+    glBindBuffer (GL_ARRAY_BUFFER, vbo_tex);
+    glVertexAttribPointer (3, 1, GL_FLOAT, GL_FALSE, 0, (GLubyte*) NULL);
 
 
     glEnableVertexAttribArray (0);
     glEnableVertexAttribArray (1);
     glEnableVertexAttribArray (2);
+    glEnableVertexAttribArray (3);
 
     createShaderPrograms();
     useShaderProgram();
@@ -496,7 +658,7 @@ int main(int argc, char *argv[]) {
         glDrawArrays (draw_mode, 0, (GLint)points.size()/3);
         glfwSwapBuffers();
         running = !glfwGetKey(GLFW_KEY_ESC) && glfwGetWindowParam (GLFW_OPENED);
-        glBindVertexArray(0);
+        //glBindVertexArray(0);
     }
 
     // close GL context and any other GLFW resources
