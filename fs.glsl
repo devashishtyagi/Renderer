@@ -1,6 +1,9 @@
 #version 420
 
+//layout(binding = 0) uniform sampler2D basic_texture;
+
 in vec3 colour, position_eye, normal_eye;
+in vec2 texture_coordinates;
 out vec4 frag_colour;
 uniform mat4 view, proj, model, orig_model_mat;
 
@@ -12,8 +15,8 @@ vec3 La = vec3(0.2, 0.2, 0.2);
 
 // surface reflectance
 vec3 Ks = vec3(1.0, 1.0, 1.0);
-vec3 Kd = vec3(1.0, 0.5, 0.0);
-vec3 Ka = vec3(1.0, 1.0, 1.0);
+vec3 Kd = colour;
+vec3 Ka = colour;
 float specular_exponent = 100.0;
 
 
@@ -37,5 +40,7 @@ void main () {
     float specular_factor = pow(dot_prod_specular, specular_exponent);
     vec3 ls = Ls*Ks*specular_factor;
 
-    frag_colour = vec4 (la + ld + ls, 1.0);
+	//vec4 texel = texture2D (basic_texture, texture_coordinates);
+
+    frag_colour = vec4(colour, 1.0);
 }

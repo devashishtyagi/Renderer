@@ -9,6 +9,7 @@
 #include "draw.h"
 #include "def.h"
 #include "tinyobjloader/tiny_obj_loader.h"
+#include "imageloader/stb_image.h"
 #include <random>
 
 #define ONE_DEG_IN_RAD (2.0 * M_PI) / 360.0 // 0.017444444
@@ -24,6 +25,7 @@ vector<GLfloat> vnormals;
 vector<GLfloat> texCordinates;
 
 vector< vector<GLfloat> > heightMap;
+ vector<vector<pair<int,pair<int,int> > > > height_map(h_width,vector<pair<int,pair<int,int> > >(h_height));
 
 GLenum draw_mode;
 
@@ -437,7 +439,7 @@ void readHeightMap(string filename) {
 
 void readHeightMapRGB(string filename) {
       string line;
-      vector<vector<pair<int,pair<int,int> > > > height_map(h_width,vector<pair<int,pair<int,int> > >(h_height));
+     
       heightMap.resize(h_width, vector<float>(h_height));
 
       ifstream myfile (filename);
@@ -494,38 +496,79 @@ int main(int argc, char *argv[]) {
 
     fillPoints(v);*/
 
-    string inputfile = "test_teddy_param.obj";
+    //string inputfile = "subdividedsubdivided_withnormal1.obj";
+   // string inputfile = "cubeVoronoiAtlas.obj";
+   // string inputfile = "cylindervoronoiatlas.obj";
+   // string inputfile = "voronoiatlas.obj";
+   //---------------------------------------------------
+   //string inputfile = "teddyfinalwithfnormals.obj";
+   //string inputfile = "teddyflatplane.obj";
+   //string inputfile = "teddyaftervoroatlas.obj";
+   //string inputfile = "teddypertriangle.obj";
+   //----------------------------------------------------
+   //string inputfile = "cubebigwithfnormals.obj";
+   //string inputfile = "smallcylindervnormal.obj";
+    //string inputfile = "cylinderflatplane.obj";
+    //string inputfile = "cubevnormals.obj";
+    //string inputfile = "Combined.obj";
+   // string inputfile = "nonSubdividedvnormal.obj";
+    //string inputfile = "combined.obj";
+    //string inputfile = "efficientML.obj";
+    //string inputfile = "cylinderHalfML.obj";
+    //string inputfile = "cylinderFP.obj";
+    //string inputfile = "nonSubdividedFP.obj";
+    //string inputfile = "subdiv000FP.obj";
+    string inputfile = "combined.obj";
+    
     vector<tinyobj::shape_t> shapes;
   
     string errr = tinyobj::LoadObj(shapes, inputfile.c_str());
-  
+	
+	std::cout<<"Reached here"<<endl;
     if (!errr.empty()) {
       std::cerr << errr << std::endl;
       exit(1);
     }
+    
+    points.clear();
+    color.clear();
+    vnormals.clear();
 
     //readHeightMap("Data/mountain.txt");
     readHeightMapRGB("Data/terrain.txt");
     float maxR = 0.0;
-    for(int i = 0; i < (int)shapes[0].mesh.indices.size()/3; i++) {
-        for(int j = 0; j < 3; j++) {
-            int idx = shapes[0].mesh.indices[3*i+j];
-            points.push_back(shapes[0].mesh.positions[3*idx+0]);
-            points.push_back(shapes[0].mesh.positions[3*idx+1]);
-            points.push_back(shapes[0].mesh.positions[3*idx+2]);
-            vnormals.push_back(shapes[0].mesh.normals[3*idx+0]);
-            vnormals.push_back(shapes[0].mesh.normals[3*idx+1]);
-            vnormals.push_back(shapes[0].mesh.normals[3*idx+2]);
-            //int x = min(h_width-1, (int)(shapes[0].mesh.texcoords[2*idx+0]*(h_width-1)));
-            //int y = min(h_height-1, (int)(shapes[0].mesh.texcoords[2*idx+1]*(h_height-1)));
-            //texCordinates.push_back(heightMap[x][y]);
-            
-            float r = hypot(shapes[0].mesh.positions[3*idx+0], shapes[0].mesh.positions[3*idx+1]);
-            maxR = max(maxR, r);
-        }
-    }
+    std::cout<<"Total number of shapes "<<shapes.size()<<std::endl;
+    for(int k = 0; k < (int)shapes.size(); k++) {
+		for(int i = 0; i < (int)shapes[k].mesh.indices.size()/3; i++) {
+			for(int j = 0; j < 3; j++) {
+				if (k != 2)
+					continue;
+				int idx = shapes[k].mesh.indices[3*i+j];
+				points.push_back(shapes[k].mesh.positions[3*idx+0]);
+				points.push_back(shapes[k].mesh.positions[3*idx+1]);
+				points.push_back(shapes[k].mesh.positions[3*idx+2]);
+				vnormals.push_back(shapes[k].mesh.normals[3*idx+0]);
+				vnormals.push_back(shapes[k].mesh.normals[3*idx+1]);
+				vnormals.push_back(shapes[k].mesh.normals[3*idx+2]);
+				float a = shapes[k].mesh.texcoords[2*idx+0];
+				float b = shapes[k].mesh.texcoords[2*idx+1];
+				int x = min(h_width-1, (int)(shapes[k].mesh.texcoords[2*idx+0]*(h_width-1)));
+				int y = min(h_height-1, (int)(shapes[k].mesh.texcoords[2*idx+1]*(h_height-1)));
+				texCordinates.push_back(heightMap[x][y]);
+		//		color.push_back(1.0*height_map[x][y].first/255.0);
+			//	color.push_back(1.0*height_map[x][y].second.first/255.0);
+				//color.push_back(1.0*height_map[x][y].second.second/255.0);
+				//std::cout<<height_map[x][y].first<<endl;
+				color.push_back(a);// helps to check the parameterisation
+				color.push_back(b);
+				color.push_back(0.0);
+				float r = hypot(shapes[k].mesh.positions[3*idx+0], shapes[k].mesh.positions[3*idx+1]);
+				maxR = max(maxR, r);
+			}
+		}
+	}
 
-    double pi = 3.14159265;
+  /*  double pi = 3.14159265;
     std::default_random_engine generator;
     std::uniform_int_distribution<int> distribution(1,10);
     
@@ -551,15 +594,58 @@ int main(int argc, char *argv[]) {
     }
 
     cout<<"Done Generating Texture Coordinates"<<endl;
-
-    color.resize(points.size(), 0);
+*/
+/*    color.resize(points.size(), 0);
 
     for(int i = 0; i < (int)points.size()/3; i++) { 
         color[i*3] = 1.0;
         color[i*3+1] = 0.0;
         color[i*3+2] = 0.0;
     }
+*/
 
+	// Texture Mapping of Rusted Surface
+	/*
+	int x, y, n;
+	int force_channels = 4;
+	unsigned char* image_data  = stbi_load("texture/skullvman.png", &x, &y, &n, force_channels);
+	if (!image_data) {
+		cerr<<"ERROR: could not load the texture file"<<endl;
+	}
+	
+	// NPOT check
+	if ((x & (x - 1)) != 0 || (y & (y - 1)) != 0) {
+		cerr<<"The image size is not power of two"<<endl;
+	}
+	
+	int width_in_bytes = x * 4;
+	unsigned char *top = NULL;
+	unsigned char *bottom = NULL;
+	unsigned char temp = 0;
+	int half_height = y / 2;
+
+	for (int row = 0; row < half_height; row++) {
+	  top = image_data + row * width_in_bytes;
+	  bottom = image_data + (y - row - 1) * width_in_bytes;
+	  for (int col = 0; col < width_in_bytes; col++) {
+		temp = *top;
+		*top = *bottom;
+		*bottom = temp;
+		top++;
+		bottom++;
+	  }
+	}
+	
+	unsigned int tex = 0;
+	glGenTextures (1, &tex);
+	glActiveTexture (GL_TEXTURE0);
+	glBindTexture (GL_TEXTURE_2D, tex);
+	glTexImage2D (GL_TEXTURE_2D, 0, GL_RGBA, x, y, 0, GL_RGBA, GL_UNSIGNED_BYTE, image_data);
+	glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	*/
 
     cout<<"Number of triangles to be rendered "<<points.size()/9<<" "<<shapes[0].mesh.indices.size()/3<<endl;
 
