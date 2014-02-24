@@ -1,60 +1,156 @@
 //
-//  draw.cpp
-//  MinorProject
+//  main.cpp
+//  Tessellation Test
 //
-//  Created by Keshav Choudhary and Devashish Tyagi on 27/02/13.
-//  Copyright (c) 2013 Devashish Tyagi and Keshav Choudhary. All rights reserved.
+//  Created by Keshav Choudhary on 2/21/2014.
+//  Copyright (c) 2014 Keshav Choudhary. All rights reserved.
 //
 
-#include "draw.h"
-#include "def.h"
-#include "tinyobjloader/tiny_obj_loader.h"
-#include "imageloader/stb_image.h"
-#include <random>
+#include <iostream>
+#include <fstream>
+#include <vector>
+#include <cstdio>
+#include <cassert>
 
-#define ONE_DEG_IN_RAD (2.0 * M_PI) / 360.0 // 0.017444444
+
+
+#include "GL/glew.h"
+#include "GLFW/glfw3.h"
+#include "assimp/Importer.hpp"
+#include "assimp/scene.h"
+#include "assimp/postprocess.h"
+#include "glm/glm.hpp"
+#include "glm/gtc/matrix_transform.hpp"
+#include "glm/gtc/quaternion.hpp"
+#include "glm/gtx/norm.hpp"
+#include "ImageMagick/Magick++.h"
+
+
+
+
 
 using namespace std;
 
-int window_width = 800, window_height = 600;
-int h_height = 512, h_width = 512;
+static uint windowWidth;
+static uint windowHeight;
+int cnt;
+static 	GLenum drawingMode;
 
-vector<GLfloat> points;
-vector<GLfloat> color;
-vector<GLfloat> vnormals;
-vector<GLfloat> texCordinates;
+int h_height = 512, h_width = 512; //dimensions of the height map
 
 vector< vector<GLfloat> > heightMap;
- vector<vector<pair<int,pair<int,int> > > > height_map(h_width,vector<pair<int,pair<int,int> > >(h_height));
+vector<vector<pair<int,pair<int,int> > > > height_map(h_width,vector<pair<int,pair<int,int> > >(h_height));
 
-GLenum draw_mode;
 
-// View parameters
-glm::vec3 cam_pos(0.0, 10.0, 30.0);
+static uint shaderProgramme;
+
+static uint vboVertex,vboColor,vboNormal,vboTex,indices;
+static uint vao;
+
+static uint tessLevelInner, tessLevelOuter;
+
+float tessLevelInnerVal, tessLevelOuterVal;
+
+glm::vec3 ball_position(0.0f, 0.0f, 0.0f);
+
+vector<GLfloat> points;
+//= {
+//	0.0,0.0,0.0,
+//	1.0,0.0,0.0,
+//	0.0,1.0,0.0
+//};
+vector<GLfloat> color;
+//= {
+//	1.0f, 0.0f,  0.0f,
+//	0.0f, 1.0f,  0.0f,
+//	0.0f, 0.0f,  1.0f
+//};
+
+vector<GLfloat> vnormals;
+vector<GLfloat> displacements;
+vector<GLfloat> texCordinates;
+
+vector<int> ind;
+//= {
+//	0,1,2
+//};
+
+
+static GLsizei IndexCount;
+static const GLuint PositionSlot = 0;
+static const GLuint PositionSlotColor = 1;
+
+float cam_speed = 10.0f; // 1 unit per second
+float cam_yaw_speed = 300.0f; // 10 degrees per second
+
+glm::vec3 cam_pos(0.0, 0.0, 10.0);
 float cam_yaw = 0.0f; // y-rotation in degrees
+
+
 glm::mat4 view_mat = glm::mat4();
 glm::mat4 proj_mat = glm::mat4();
 glm::mat4 model_mat = glm::mat4();
 
-// Camera movement parameters
-float camera_speed = 0.1f;
+int view,proj,model,originalModel,colorMap,displacementMap;
+
+glm::fquat orientationQuaternion_;
+
+double mouseX = 1;
+double mouseY = 0;
 
 // Projection parameters
-float near = 0.1f;  // near clipping plane
-float far = 40.0f; // far clipping plane
+float near = 1.0f;  // near clipping plane
+float far = 100.0f; // far clipping plane
 float fov = 75.0f;
 
-// Initialize Data Object
-InitializeData *v;
+Magick::Image* m_pImage;
+Magick::Blob m_blob;
 
-// Shader programs
-GLuint shader_program[4];
-int currentProgram = 0;
-vector<string> fsprograms = {"fs.glsl"};
-unsigned int view_mat_location[4], proj_mat_location[4], model_mat_location[4], orig_model_mat_location[4];
+GLenum m_textureTarget;
+GLuint m_textureObj;
 
-// VBO data objects
-unsigned int vbo_vertex, vbo_color, vbo_normal, vbo_tex, vao;
+
+
+void initialize()
+{
+	orientationQuaternion_ = glm::quat();
+	orientationQuaternion_ = glm::normalize(orientationQuaternion_);
+
+}
+void rotateit(const glm::detail::float32& degrees, const glm::vec3& axis)
+{
+	//    if ( axis == glm::vec3(0.0f, 1.0f, 0.0f) )
+	//        orientationQuaternion_ =  glm::normalize(glm::angleAxis(degrees, axis)) * orientationQuaternion_;
+	//    else
+	//	{
+	orientationQuaternion_ =  glm::normalize(glm::angleAxis(degrees, axis)) *  orientationQuaternion_;
+
+	//	}
+}
+
+void buildView() {
+
+	//	glm::quat temp = glm::conjugate(orientationQuaternion_);
+	//view_mat = glm::mat4_cast(temp);
+//	view_mat = glm::mat4(1);
+//	view_mat = glm::translate(view_mat, glm::vec3(-cam_pos[0], -cam_pos[1], -cam_pos[2]));
+	view_mat = glm::lookAt(cam_pos, glm::vec3(0.0, 0.0, 0.0), glm::vec3(0.0, 1.0, 0.0));
+
+}
+
+void buildProj() {
+    float aspect = (float)windowWidth / (float)windowHeight; // aspect ratio
+    proj_mat = glm::perspective(fov, aspect, near, far);
+}
+
+void buildModel() {
+    //float new_position = 0.0f;
+	//    model_mat = glm::translate(glm::mat4(1.0f), glm::vec3(new_position, 0.0, 0.0));
+	model_mat = glm::scale(glm::mat4(1.0f), glm::vec3(0.5f));
+}
+
+
+
 
 static void checkError(GLint status, const char *msg)
 {
@@ -63,15 +159,6 @@ static void checkError(GLint status, const char *msg)
         printf("%s\n", msg);
         exit(EXIT_FAILURE);
     }
-}
-
-void shutDown(int returnCode) {
-    printf("There was an error in running the code with error %d\n",returnCode);
-    GLenum res = glGetError();
-    const GLubyte *errString = gluErrorString(res);
-    printf("Error is %s\n", errString);
-    glfwTerminate();
-    exit(returnCode);
 }
 
 string textFileRead (const char* fileName) {
@@ -84,659 +171,538 @@ string textFileRead (const char* fileName) {
             data.append("\n");
             data.append(line);
         }
+		myfile.close();
     }
+	else
+		cout<<"Could not open "<<string(fileName)<<endl;
+
+
     return data;
 }
 
-void fillPoints(InitializeData *v)
-{
-    points.clear();
-    color.clear();
-    vnormals.clear();
 
-    for(int i = 0;i < (int)v->Triangles.size();i++)
-    {
-        if (v->Triangles[i].isVisible)
-        {
-            // 1st vertex
-            points.push_back(v->Triangles[i].first->x);
-            points.push_back(v->Triangles[i].first->y);
-            points.push_back(v->Triangles[i].first->z);
+void useShaderPrograms(){
+	glUseProgram(shaderProgramme);
 
-            color.push_back(v->Triangles[i].first->r);
-            color.push_back(v->Triangles[i].first->g);
-            color.push_back(v->Triangles[i].first->b);
+//	glUniformMatrix4fv (view, 1, GL_FALSE, &view_mat[0][0]);
+//	glUniformMatrix4fv (proj[prog], 1, GL_FALSE, &proj_mat[0][0]);
+//	glUniformMatrix4fv (model[prog], 1, GL_FALSE, &model_mat[0][0]);
+//	glUniformMatrix4fv (originalModel[prog], 1, GL_FALSE, &model_mat[0][0] );
 
-           vnormals.push_back(v->Triangles[i].fnormal.x);
-           vnormals.push_back(v->Triangles[i].fnormal.y);
-           vnormals.push_back(v->Triangles[i].fnormal.z);
+	glUniform1f(tessLevelInner, tessLevelInnerVal);
+	glUniform1f(tessLevelOuter, tessLevelOuterVal);
+	glUniformMatrix4fv (view, 1, GL_FALSE, &view_mat[0][0]);
+	glUniformMatrix4fv (proj, 1, GL_FALSE, &proj_mat[0][0]);
+	glUniformMatrix4fv (model, 1, GL_FALSE, &model_mat[0][0]);
+	glUniform1i(colorMap, 0);
+	glUniform1i(displacementMap,1);
 
-            // 2nd vertex
-            points.push_back(v->Triangles[i].second->x);
-            points.push_back(v->Triangles[i].second->y);
-            points.push_back(v->Triangles[i].second->z);
-
-            color.push_back(v->Triangles[i].second->r);
-            color.push_back(v->Triangles[i].second->g);
-            color.push_back(v->Triangles[i].second->b);
-
-            vnormals.push_back(v->Triangles[i].fnormal.x);
-            vnormals.push_back(v->Triangles[i].fnormal.y);
-            vnormals.push_back(v->Triangles[i].fnormal.z);
+	//	glUniformMatrix4fv (originalModel[prog], 1, GL_FALSE, &model_mat[0][0] );
 
 
-            // 3rd vertex
-            points.push_back(v->Triangles[i].third->x);
-            points.push_back(v->Triangles[i].third->y);
-            points.push_back(v->Triangles[i].third->z);
 
-            color.push_back(v->Triangles[i].third->r);
-            color.push_back(v->Triangles[i].third->g);
-            color.push_back(v->Triangles[i].third->b);
-
-            vnormals.push_back(v->Triangles[i].fnormal.x);
-            vnormals.push_back(v->Triangles[i].fnormal.y);
-            vnormals.push_back(v->Triangles[i].fnormal.z);
-
-
-        }
-    }
 }
 
-void fillColor() {
-
-    color.clear();  
-    for(int i = 0;i < (int)v->Triangles.size();i++)
-    {
-        if (v->Triangles[i].isVisible)
-        {
-            // 1st vertex
-            color.push_back(v->Triangles[i].first->r);
-            color.push_back(v->Triangles[i].first->g);
-            color.push_back(v->Triangles[i].first->b);
-            // 2nd vertex
-            color.push_back(v->Triangles[i].second->r);
-            color.push_back(v->Triangles[i].second->g);
-            color.push_back(v->Triangles[i].second->b);
-            // 3rd vertex
-            color.push_back(v->Triangles[i].third->r);
-            color.push_back(v->Triangles[i].third->g);
-            color.push_back(v->Triangles[i].third->b);
-        }
-    }
-}
-
-
-void buildView() {
-    view_mat = glm::lookAt(cam_pos, glm::vec3(0.0, 0.0, 0.0), glm::vec3(0.0, 1.0, 0.0));
-}
-
-void buildProj() {
-    float aspect = (float)window_width / (float)window_height; // aspect ratio
-    proj_mat = glm::perspective(fov, aspect, near, far);
-}
-
-void buildModel() {
-    float new_position = 0.0f;
-    model_mat = glm::translate(glm::mat4(1.0f), glm::vec3(new_position, 0.0, 0.0));
-}
-
-void useShaderProgram() {
-	glUseProgram(shader_program[currentProgram]);
-
-    glUniformMatrix4fv (view_mat_location[currentProgram], 1, GL_FALSE, &view_mat[0][0]);
-    glUniformMatrix4fv (proj_mat_location[currentProgram], 1, GL_FALSE, &proj_mat[0][0]);
-    glUniformMatrix4fv (model_mat_location[currentProgram], 1, GL_FALSE, &model_mat[0][0]);
-    glUniformMatrix4fv (orig_model_mat_location[currentProgram], 1, GL_FALSE, &model_mat[0][0]);
-}
 
 void createShaderPrograms() {
-	std::string vertex_shader = textFileRead ("vs.glsl");
+
+	string vertexShader = textFileRead ("vs.glsl");
 	GLuint vs = glCreateShader (GL_VERTEX_SHADER);
-	const char* str = vertex_shader.c_str();
-    glShaderSource (vs, 1, &str, NULL);
+	const char* stra = vertexShader.c_str();
+    glShaderSource (vs, 1, &stra, NULL);
     glCompileShader (vs);
     int params = -1;
     glGetShaderiv(vs,GL_COMPILE_STATUS,&params);
     checkError(params,"Vertex Shader not compiled");
 
-    for(int i = 0; i < (int)fsprograms.size(); i++) {
-    	shader_program[i] = glCreateProgram();
-	    
-	    std::string fragment_shader = textFileRead (fsprograms[i].c_str());
-	    GLuint fs = glCreateShader (GL_FRAGMENT_SHADER);
-	    const char* strb = fragment_shader.c_str();
-	    glShaderSource (fs, 1, &strb, NULL);
-	    glCompileShader (fs);
-	    params = -1;
-	    glGetShaderiv(fs,GL_COMPILE_STATUS,&params);
-	    checkError(params,"Fragment Shader not compiled");
+	string TessellationControlShader = textFileRead ("tcs.glsl");
+	GLuint tcs = glCreateShader (GL_TESS_CONTROL_SHADER);
+	const char* strb = TessellationControlShader.c_str();
+    glShaderSource (tcs, 1, &strb, NULL);
+    glCompileShader (tcs);
+	params = -1;
+    glGetShaderiv(tcs,GL_COMPILE_STATUS,&params);
+    checkError(params,"Tessellation Control not compiled");
 
-	    glAttachShader(shader_program[i],vs);
-	    glAttachShader(shader_program[i],fs);
-	    glLinkProgram (shader_program[i]);
+	string TessellationEvaluationShader = textFileRead ("tes.glsl");
+	GLuint tes = glCreateShader (GL_TESS_EVALUATION_SHADER);
+	const char* strc = TessellationEvaluationShader.c_str();
+    glShaderSource (tes, 1, &strc, NULL);
+    glCompileShader (tes);
+	params = -1;
+    glGetShaderiv(tes,GL_COMPILE_STATUS,&params);
+    checkError(params,"Tessellation Evaluation not compiled");
 
-    	glUseProgram(shader_program[i]);
-    	view_mat_location[i] = glGetUniformLocation (shader_program[currentProgram], "view");
-    	proj_mat_location[i] = glGetUniformLocation (shader_program[currentProgram], "proj");
-    	model_mat_location[i] = glGetUniformLocation (shader_program[currentProgram], "model");
-    	orig_model_mat_location[i] = glGetUniformLocation (shader_program[currentProgram], "orig_model_mat");
-	}
+	string fragment_shader = textFileRead ("fs.glsl");
+	GLuint fs = glCreateShader (GL_FRAGMENT_SHADER);
+	const char* strd = fragment_shader.c_str();
+	glShaderSource (fs, 1, &strd, NULL);
+	glCompileShader (fs);
+	params = -1;
+	glGetShaderiv(fs,GL_COMPILE_STATUS,&params);
+	checkError(params,"Fragment Shader not compiled");
+
+
+	shaderProgramme = glCreateProgram ();
+	glAttachShader(shaderProgramme,vs);
+	glAttachShader(shaderProgramme,tcs);
+	glAttachShader(shaderProgramme,tes);
+	glAttachShader(shaderProgramme,fs);
+
+	glBindAttribLocation (shaderProgramme, 0, "vertex_position");
+	glBindAttribLocation (shaderProgramme, 1, "vertex_colour");
+	glBindAttribLocation (shaderProgramme, 2, "vertex_normal");
+	glBindAttribLocation (shaderProgramme, 3, "texCordinates");
+//	glBindAttribLocation (shaderProgramme[i], 4, "displacements");
+
+	glLinkProgram (shaderProgramme);
+
+	//		view[i] = glGetUniformLocation (shaderProgramme[i], "view");
+	//		proj[i] = glGetUniformLocation (shaderProgramme[i], "proj");
+//		model[i] = glGetUniformLocation (shaderProgramme[i], "model");
+//		originalModel[i] = glGetUniformLocation(shaderProgramme[i], "orig_model_mat");
+
+	tessLevelInner = glGetUniformLocation (shaderProgramme, "tessLevelInner");
+	tessLevelOuter = glGetUniformLocation (shaderProgramme, "tessLevelOuter");
+
+	view = glGetUniformLocation (shaderProgramme, "view");
+	proj = glGetUniformLocation (shaderProgramme, "proj");
+	model = glGetUniformLocation (shaderProgramme, "model");
+	colorMap = glGetUniformLocation(shaderProgramme, "gColorMap");
+	displacementMap = glGetUniformLocation(shaderProgramme, "gDisplacementMap");
+	//	originalModel = glGetUniformLocation(shaderProgramme[i], "orig_model_mat");
+
 }
 
-void updateCameraPosKeyboard() {
-    static bool tabEventActive = false;
-    static bool leftEventActive = false;
-    static bool rightEventActive = false;
-    static bool spaceEventActive = false;
-    static bool homeEventActive = false;
-    static bool shiftEventActive = false;
-
-    if (glfwGetKey(GLFW_KEY_DOWN) == GLFW_PRESS) {
-        cam_pos.z += camera_speed;
-    }
-    if (glfwGetKey(GLFW_KEY_UP) == GLFW_PRESS) {
-        cam_pos.z -= camera_speed;
-    }
-
-    if (glfwGetKey(GLFW_KEY_TAB) == GLFW_PRESS)
-    {
-        tabEventActive = true;
-    }
-    else {
-        if (tabEventActive) {
-            if (draw_mode == GL_TRIANGLES) {
-                draw_mode = GL_LINE_STRIP;
-            }
-            else {
-                draw_mode = GL_TRIANGLES;
-            }
-            tabEventActive = false;
-        }
-    }
-
-    if(glfwGetKey(GLFW_KEY_RIGHT) == GLFW_PRESS) {
-        rightEventActive = true;
-    }
-    else {
-        if (rightEventActive) {
-            v->changeFile(true);
-            fillPoints(v);
-            glBindBuffer (GL_ARRAY_BUFFER, vbo_vertex);
-            glBufferData (GL_ARRAY_BUFFER, points.size() * sizeof (GLfloat), &points[0], GL_DYNAMIC_DRAW);
-            glBindBuffer (GL_ARRAY_BUFFER, vbo_color);
-            glBufferData (GL_ARRAY_BUFFER, color.size() * sizeof (GLfloat), &color[0], GL_DYNAMIC_DRAW);
-            glBindBuffer (GL_ARRAY_BUFFER, vbo_normal);
-            glBufferData (GL_ARRAY_BUFFER, vnormals.size() * sizeof (GLfloat), &vnormals[0], GL_DYNAMIC_DRAW);
-            glBindBuffer (GL_ARRAY_BUFFER, vbo_tex);
-            glBufferData (GL_ARRAY_BUFFER, texCordinates.size() * sizeof (GLfloat), &texCordinates[0], GL_DYNAMIC_DRAW);
-
-            rightEventActive = false;
-        }
-    }
-
-    if(glfwGetKey(GLFW_KEY_LEFT) == GLFW_PRESS) {
-        leftEventActive = true;
-    }
-    else {
-        if (leftEventActive) {
-            v->changeFile(false);
-            fillPoints(v);
-            glBindBuffer (GL_ARRAY_BUFFER, vbo_vertex);
-            glBufferData (GL_ARRAY_BUFFER, points.size() * sizeof (GLfloat), &points[0], GL_DYNAMIC_DRAW);
-            glBindBuffer (GL_ARRAY_BUFFER, vbo_color);
-            glBufferData (GL_ARRAY_BUFFER, color.size() * sizeof (GLfloat), &color[0], GL_DYNAMIC_DRAW);
-            glBindBuffer (GL_ARRAY_BUFFER, vbo_normal);
-            glBufferData (GL_ARRAY_BUFFER, vnormals.size() * sizeof (GLfloat), &vnormals[0], GL_DYNAMIC_DRAW);
-            glBindBuffer (GL_ARRAY_BUFFER, vbo_tex);
-            glBufferData (GL_ARRAY_BUFFER, texCordinates.size() * sizeof (GLfloat), &texCordinates[0], GL_DYNAMIC_DRAW);
+void generateVertexBuffer(){
 
 
-            leftEventActive = false;
-        }
-    }
-    if (glfwGetKey(GLFW_KEY_SPACE) == GLFW_PRESS) {
-        spaceEventActive = true;
-    }
-    else  {
-        if(spaceEventActive) {
-            v->changeColorModel();
-            fillColor();
-            glBindBuffer (GL_ARRAY_BUFFER, vbo_color);
-            glBufferData (GL_ARRAY_BUFFER, color.size() * sizeof (GLfloat), &color[0], GL_DYNAMIC_DRAW);
-            spaceEventActive = false;            
-        }
-    }
+	IndexCount = (int)ind.size();
 
-    if (glfwGetKey(GLFW_KEY_HOME) == GLFW_PRESS) {
-        homeEventActive = true;
-    }
-    else  {
-        if(homeEventActive) {
-            v->changeSides();
-            fillPoints(v);
-            glBindBuffer (GL_ARRAY_BUFFER, vbo_vertex);
-            glBufferData (GL_ARRAY_BUFFER, points.size() * sizeof (GLfloat), &points[0], GL_DYNAMIC_DRAW);
-            glBindBuffer (GL_ARRAY_BUFFER, vbo_color);
-            glBufferData (GL_ARRAY_BUFFER, color.size() * sizeof (GLfloat), &color[0], GL_DYNAMIC_DRAW);
-            glBindBuffer (GL_ARRAY_BUFFER, vbo_normal);
-            glBufferData (GL_ARRAY_BUFFER, vnormals.size() * sizeof (GLfloat), &vnormals[0], GL_DYNAMIC_DRAW);
-            glBindBuffer (GL_ARRAY_BUFFER, vbo_tex);
-            glBufferData (GL_ARRAY_BUFFER, texCordinates.size() * sizeof (GLfloat), &texCordinates[0], GL_DYNAMIC_DRAW);
+	// IndexCount = sizeof(Faces) / sizeof(Faces[0]);
+	vboVertex = 0;
+    glGenBuffers(1, &vboVertex);
+    glBindBuffer(GL_ARRAY_BUFFER, vboVertex);
+	glBufferData(GL_ARRAY_BUFFER, points.size() * sizeof(GLfloat), &points[0], GL_STATIC_DRAW);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
+
+    // Create the VBO for indices:
+	indices = 0;
+    glGenBuffers(1, &indices);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indices);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, ind.size() * sizeof(int), &ind[0], GL_STATIC_DRAW);
 
 
-            homeEventActive = false;
-        }
-    }
+	vboColor = 0;
+    glGenBuffers (1, &vboColor);
+    glBindBuffer (GL_ARRAY_BUFFER, vboColor);
+    glBufferData (GL_ARRAY_BUFFER, color.size() * sizeof (GLfloat), &color[0], GL_STATIC_DRAW);
+	glEnableVertexAttribArray(1);
+	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, 0);
 
-    if (glfwGetKey(GLFW_KEY_LSHIFT) == GLFW_PRESS)
-    {
-        shiftEventActive = true;
-    }
-    else {
-        if (shiftEventActive) {
-        	currentProgram = (currentProgram+1)%4;
-        	useShaderProgram();
-            shiftEventActive = false;
-        }
-    }
+    vboNormal = 0;
+    glGenBuffers (1, &vboNormal);
+    glBindBuffer (GL_ARRAY_BUFFER, vboNormal);
+    glBufferData (GL_ARRAY_BUFFER, vnormals.size() * sizeof (GLfloat), &vnormals[0], GL_STATIC_DRAW);
+	glEnableVertexAttribArray(2);
+	glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, 0, 0);
+
+    vboTex = 0;
+    glGenBuffers (1, &vboTex);
+    glBindBuffer (GL_ARRAY_BUFFER, vboTex);
+	glBufferData (GL_ARRAY_BUFFER, texCordinates.size() * sizeof (GLfloat), &texCordinates[0], GL_STATIC_DRAW);
+	glEnableVertexAttribArray(3);
+	glVertexAttribPointer(3, 2, GL_FLOAT, GL_FALSE, 0, 0);
+
+
+
+//
+//	vboDisplace = 0;
+//    glGenBuffers (1, &vboDisplace);
+//    glBindBuffer (GL_ARRAY_BUFFER, vboDisplace);
+//    glBufferData (GL_ARRAY_BUFFER, displacements.size() * sizeof (GLfloat), &displacements[0], GL_DYNAMIC_DRAW);
+
+
 }
 
-void GLFWCALL updateCameraPosMouse(int x, int y) {
-	static bool pressed = false;
-    static glm::vec3 V2(0.0, 0.0, 0.0);
-    glm::vec3 V1((double)x, (double)y, 0.0);
-    V1[0] = V1[0]/((double) window_width/2.0) - 1.0;
-    V1[1] = 1.0 - V1[1]/((double) window_height/2.0);
-    if (pow(V1[0], 2) + pow(V1[0], 2) < 0.5) {
-        V1[2] = sqrt(1.0 - pow(V1[0], 2) + pow(V1[1], 2));
-    }
-    else {
-        V1[2] = 0.5/sqrt(pow(V1[0], 2) + pow(V1[1], 2));
-    }
+void generateVertexArray(){
+	vao = 0;
+    glGenVertexArrays (1, &vao);
+	glBindVertexArray (vao);
+//	glBindBuffer (GL_ARRAY_BUFFER, vboVertex);
+//	glVertexAttribPointer (0, 3, GL_FLOAT, GL_FALSE, 0, (GLubyte*)NULL);
+//	glBindBuffer (GL_ARRAY_BUFFER, vboColor);
+//    glVertexAttribPointer (1, 3, GL_FLOAT, GL_FALSE, 0, (GLubyte*) NULL);
+//    glBindBuffer (GL_ARRAY_BUFFER, vboNormal);
+//    glVertexAttribPointer (2, 3, GL_FLOAT, GL_FALSE, 0, (GLubyte*) NULL);
+//    glBindBuffer (GL_ARRAY_BUFFER, vboTex);
+//    glVertexAttribPointer (3, 1, GL_FLOAT, GL_FALSE, 0, (GLubyte*) NULL);
+//    glBindBuffer (GL_ARRAY_BUFFER, vboDisplace);
+//    glVertexAttribPointer (4, 1, GL_FLOAT, GL_FALSE, 0, (GLubyte*) NULL);
 
-	bool performRotation = true;
-	if (glfwGetMouseButton(GLFW_MOUSE_BUTTON_LEFT) != GLFW_PRESS) {
-		pressed = false;
-        V2 = V1;
-		return;
-	}
-    else if(!pressed){
-		performRotation = false;
-		pressed = true;
-	}
-
-	if (performRotation){
-		V1 = glm::normalize(V1);
-		V2 = glm::normalize(V2);
-        glm::vec3 N = glm::cross(V2, V1);
-        float angle = acos(min(1.0f, glm::dot(V2, V1)));
-        if (isnan(angle)) {
-			return;
-		}
-        model_mat = glm::rotate(model_mat, (float)(angle*180.0/M_PI), N);
-	}
-
-    V2 = V1;
-}
+//	glEnableVertexAttribArray (0);
+//	glEnableVertexAttribArray (1);
+//	glEnableVertexAttribArray (2);
+//	glEnableVertexAttribArray (3);
+//	glEnableVertexAttribArray (4);
 
 
-void _update_fps_counter () {
-    // timer/frame counter
-    static double previous_seconds = glfwGetTime ();
-    static int frame_count;
-    double current_seconds = glfwGetTime ();
-    double elapsed_seconds = current_seconds - previous_seconds;
-    if (elapsed_seconds > 0.25) {
-        previous_seconds = current_seconds;
-        double fps = (double)frame_count / elapsed_seconds;
-        char tmp[128];
-        sprintf (tmp, "Voxel Viewer @ fps: %.2lf", fps);
-        glfwSetWindowTitle (tmp);
-        frame_count = 0;
-    }
-    frame_count++;
-}
-
-// Callback function to handle resize event
-/* Callback function section */
-void GLFWCALL resize(int width, int height) {
-    float near = 0.1f; // clipping plane
-    float far = 100.0f; // clipping plane
-    float fov = 45.0f;
-    float aspect = (float)width / (float)height; // aspect ratio
-
-    proj_mat = glm::perspective(fov, aspect, near, far);
-
-    glViewport(0, 0, width, height);
-
-	window_width = width;
-	window_height = height;
-}
-
-void readHeightMap(string filename) {
-    int width = 256;
-    int height = 256;
-    heightMap.resize(width, vector<GLfloat>(height));
-
-    ifstream infile(filename);
-    if (infile.is_open()) {
-        string line;
-        for(int i = 0; i < width; i++) {
-            getline(infile, line);
-            stringstream ss(line);
-            for(int j = 0; j < height; j++) {
-                int h;
-                ss>>h;
-                heightMap[i][j] = (GLfloat)h/75.0;
-            }
-        }
-    }
-    else {
-        cout<<"Could not open the file"<<endl;
-    }
 }
 
 void readHeightMapRGB(string filename) {
-      string line;
-     
-      heightMap.resize(h_width, vector<float>(h_height));
+	string line;
 
-      ifstream myfile (filename);
-      if (myfile.is_open())
-      {
-      	int cnt = 0;  
+	heightMap.resize(h_width, vector<float>(h_height));
+
+	ifstream myfile (filename);
+	if (myfile.is_open())
+	{
+      	int cnt = 0;
         while ( getline (myfile,line) )
         {
-         
-         cnt ++;
-         
-         if(cnt > 1)
-         {
-            int v = 0;
-            vector<int> val;
-            for(int i = 0; i < (int)line.size(); i++){
-            if(val.size() == 5)
-                break;
-            int r = line[i]-'0';
-            if(r >=0 && r <= 9 )
-                v = v*10+r;
-            if(line[i] == ',' ||line[i] == ':')
-            {
-                val.push_back(v);
-                v = 0;
-            }
-               
-                
-            }
-            height_map[val[0]][val[1]] = make_pair(val[2],make_pair(val[3],val[4]));
-            heightMap[val[0]][val[1]] = (float)val[2]/255.0;
-           }
+
+			cnt ++;
+
+			if(cnt > 1)
+			{
+				int v = 0;
+				vector<int> val;
+				for(int i = 0; i < (int)line.size(); i++){
+					if(val.size() == 5)
+						break;
+					int r = line[i]-'0';
+					if(r >=0 && r <= 9 )
+						v = v*10+r;
+					if(line[i] == ',' ||line[i] == ':')
+					{
+						val.push_back(v);
+						v = 0;
+					}
+
+
+				}
+				height_map[val[0]][val[1]] = make_pair(val[2],make_pair(val[3],val[4]));
+				heightMap[val[0]][val[1]] = (float)val[2]/255.0;
+			}
         }
         myfile.close();
-      }
-      else 
-      	cout << "Unable to open file"<<endl; 
+	}
+	else
+      	cout << "Unable to open file"<<endl;
 
-} 
+}
 
-int main(int argc, char *argv[]) {
-     if (!(argc >= 2)) {
-        cerr << "The number of arguments is not appropriate - Terminating" << endl;
-        return 1;
+void initMesh(unsigned int Index, const aiMesh* paiMesh)
+{
+
+    cout<<paiMesh->mNumVertices<<endl;
+
+    const aiVector3D Zero3D(1.0f, 0.0f, 0.0f);
+
+    for (unsigned int i = 0 ; i < paiMesh->mNumVertices ; i++) {
+        const aiVector3D* pPos      = &(paiMesh->mVertices[i]);
+        const aiVector3D* pNormal   = paiMesh->HasNormals() ?  &(paiMesh->mNormals[i]):&Zero3D ;
+        const aiVector3D* pTexCoord = paiMesh->HasTextureCoords(0) ? &(paiMesh->mTextureCoords[0][i]) : &Zero3D;
+
+
+		points.push_back(pPos->x);
+		points.push_back(pPos->y);
+		points.push_back(pPos->z);
+
+		texCordinates.push_back(pTexCoord->x);
+		texCordinates.push_back(pTexCoord->y);
+
+		vnormals.push_back(pNormal->x);
+		vnormals.push_back(pNormal->y);
+		vnormals.push_back(pNormal->z);
+
+		color.push_back(pTexCoord->x);
+		color.push_back(pTexCoord->y);
+		color.push_back(0.0f);
+
+	}
+	cout<<paiMesh->mNumFaces<<endl;
+    for (unsigned int i = 0 ; i < paiMesh->mNumFaces ; i++) {
+        const aiFace& Face = paiMesh->mFaces[i];
+        assert(Face.mNumIndices == 3);
+        ind.push_back(Face.mIndices[0]);
+        ind.push_back(Face.mIndices[1]);
+        ind.push_back(Face.mIndices[2]);
+
     }
 
-    vector<string> a;
-    for(int i=1;i<argc;i++)
-        a.push_back(argv[i]);
 
-    //fill in the data
-/*    v = new InitializeData();
-    v->initializeData(a);
+}
 
-    fillPoints(v);*/
 
-    //string inputfile = "subdividedsubdivided_withnormal1.obj";
-   // string inputfile = "cubeVoronoiAtlas.obj";
-   // string inputfile = "cylindervoronoiatlas.obj";
-   // string inputfile = "voronoiatlas.obj";
-   //---------------------------------------------------
-   //string inputfile = "teddyfinalwithfnormals.obj";
-   //string inputfile = "teddyflatplane.obj";
-   //string inputfile = "teddyaftervoroatlas.obj";
-   //string inputfile = "teddypertriangle.obj";
-   //----------------------------------------------------
-   //string inputfile = "cubebigwithfnormals.obj";
-   //string inputfile = "smallcylindervnormal.obj";
-    //string inputfile = "cylinderflatplane.obj";
-    //string inputfile = "cubevnormals.obj";
-    //string inputfile = "Combined.obj";
-   // string inputfile = "nonSubdividedvnormal.obj";
-    //string inputfile = "combined.obj";
-    //string inputfile = "efficientML.obj";
-    //string inputfile = "cylinderHalfML.obj";
-    //string inputfile = "cylinderFP.obj";
-    //string inputfile = "nonSubdividedFP.obj";
-    //string inputfile = "subdiv000FP.obj";
-    string inputfile = "combined.obj";
-    
-    vector<tinyobj::shape_t> shapes;
-  
-    string errr = tinyobj::LoadObj(shapes, inputfile.c_str());
-	
-	std::cout<<"Reached here"<<endl;
-    if (!errr.empty()) {
-      std::cerr << errr << std::endl;
-      exit(1);
+
+void objloader(string fileName){
+
+	Assimp::Importer Importer;
+
+	const aiScene* pScene = Importer.ReadFile(fileName.c_str(), aiProcess_JoinIdenticalVertices);
+
+	points.clear();
+	vnormals.clear();
+	texCordinates.clear();
+	color.clear();
+
+	cout<<"Number of meshes "<<pScene->mNumMeshes<<endl;
+
+	for (unsigned int i = 0 ; i < pScene->mNumMeshes ; i++) {
+        const aiMesh* paiMesh = pScene->mMeshes[i];
+        initMesh(i, paiMesh);
     }
-    
-    points.clear();
-    color.clear();
-    vnormals.clear();
 
-    //readHeightMap("Data/mountain.txt");
-    readHeightMapRGB("Data/terrain.txt");
-    float maxR = 0.0;
-    std::cout<<"Total number of shapes "<<shapes.size()<<std::endl;
-    for(int k = 0; k < (int)shapes.size(); k++) {
-		for(int i = 0; i < (int)shapes[k].mesh.indices.size()/3; i++) {
-			for(int j = 0; j < 3; j++) {
-				if (k != 2)
-					continue;
-				int idx = shapes[k].mesh.indices[3*i+j];
-				points.push_back(shapes[k].mesh.positions[3*idx+0]);
-				points.push_back(shapes[k].mesh.positions[3*idx+1]);
-				points.push_back(shapes[k].mesh.positions[3*idx+2]);
-				vnormals.push_back(shapes[k].mesh.normals[3*idx+0]);
-				vnormals.push_back(shapes[k].mesh.normals[3*idx+1]);
-				vnormals.push_back(shapes[k].mesh.normals[3*idx+2]);
-				float a = shapes[k].mesh.texcoords[2*idx+0];
-				float b = shapes[k].mesh.texcoords[2*idx+1];
-				int x = min(h_width-1, (int)(shapes[k].mesh.texcoords[2*idx+0]*(h_width-1)));
-				int y = min(h_height-1, (int)(shapes[k].mesh.texcoords[2*idx+1]*(h_height-1)));
-				texCordinates.push_back(heightMap[x][y]);
-		//		color.push_back(1.0*height_map[x][y].first/255.0);
-			//	color.push_back(1.0*height_map[x][y].second.first/255.0);
-				//color.push_back(1.0*height_map[x][y].second.second/255.0);
-				//std::cout<<height_map[x][y].first<<endl;
-				color.push_back(a);// helps to check the parameterisation
-				color.push_back(b);
-				color.push_back(0.0);
-				float r = hypot(shapes[k].mesh.positions[3*idx+0], shapes[k].mesh.positions[3*idx+1]);
-				maxR = max(maxR, r);
-			}
+	cout<<ind.size()<<" "<<points.size()<<endl;
+
+
+}
+
+bool LoadTexture(const std::string& fileName){
+	try {
+        m_pImage = new Magick::Image(fileName);
+        m_pImage->write(&m_blob, "RGBA");
+    }
+    catch (Magick::Error& Error) {
+        std::cout << "Error loading texture '" << fileName << "': " << Error.what() << std::endl;
+        return false;
+    }
+	m_textureObj = 0;
+	m_textureTarget = GL_TEXTURE_2D;
+    glGenTextures(1, &m_textureObj);
+    glBindTexture(m_textureTarget, m_textureObj);
+    glTexImage2D(m_textureTarget, 0, GL_RGBA, m_pImage->columns(), m_pImage->rows(), 0, GL_RGBA, GL_UNSIGNED_BYTE, m_blob.data());
+    glTexParameterf(m_textureTarget, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameterf(m_textureTarget, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+	return true;
+}
+
+void Bind(GLenum TextureUnit)
+{
+    glActiveTexture(TextureUnit);
+    glBindTexture(m_textureTarget, m_textureObj);
+}
+
+
+
+static void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods)
+{
+    if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
+	glfwSetWindowShouldClose(window, GL_TRUE);
+	if (key == GLFW_KEY_SPACE && action == GLFW_PRESS) {
+		cnt = (cnt+1)%3;
+		switch (cnt) {
+			case 0:
+			drawingMode = GL_FILL;
+			break;
+			case 1:
+			drawingMode = GL_LINE;
+			break;
+			case 2:
+			drawingMode = GL_POINT;
+			break;
+			default:
+			break;
 		}
+
+	}
+//	if(key == GLFW_KEY_TAB &&  action == GLFW_PRESS){
+//		prog = (prog+1)%2;
+//		useShaderPrograms();
+//	}
+
+	if(key == GLFW_KEY_R && action == GLFW_PRESS){
+		model_mat = glm::scale(glm::mat4(1.0f), glm::vec3(0.5f));
+		glUniformMatrix4fv(model,1,GL_FALSE,&model_mat[0][0]);
+	}
+}
+
+static void cursorCallback(GLFWwindow* window, double x, double y){
+	int state = glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_1);
+	if (state == GLFW_PRESS) {
+
+
+
+		static glm::vec3 V2(0.0, 0.0, 0.0);
+		double mouse_x = (x/(double)windowWidth)*2-1;
+		double mouse_y = 1-(y/double(windowHeight))*2;
+		if(mouse_x*mouse_x + mouse_y*mouse_y < 0.0001) return;
+		glm::vec3 ballMovement = glm::vec3(mouse_x,mouse_y,0);
+		ball_position = ball_position + ballMovement;
+
+		float speed = glm::l1Norm(ballMovement);
+
+		glm::vec3 downwards  = glm::vec3(0.0f, 0.0f, 1.0f);
+		glm::vec3 rotationAxis = glm::normalize(glm::cross(downwards, ballMovement));
+
+		//glm::fquat rotation = glm::normalize(glm::angleAxis(speed, rotationAxis));
+		glm::vec3 am(0.0f,-1.0f,0.0);
+		//	rotateit(speed/5.0f, am);
+		//	buildView();
+		//	glUniformMatrix4fv (view[prog], 1, GL_FALSE, &view_mat[0][0]);
+		model_mat = glm::rotate(model_mat, speed, rotationAxis);
+		glUniformMatrix4fv(model,1,GL_FALSE,&model_mat[0][0]);
+
+	}
+}
+
+void scrollCallback(GLFWwindow* window, double xoff, double yoff){
+
+	cam_pos.z += yoff;
+	buildView();
+	glUniformMatrix4fv(view,1,GL_FALSE,&view_mat[0][0]);
+
+}
+
+
+static void resizeCallback(GLFWwindow* window,int width, int height){
+	windowWidth = width;
+	windowHeight = height;
+	float aspect = (float)windowWidth / (float)windowHeight; // aspect ratio
+    proj_mat = glm::perspective(fov, aspect, near, far);
+
+	glUniformMatrix4fv(proj,1,GL_FALSE,&proj_mat[0][0]);
+
+}
+
+
+
+int main(int argc, const char * argv[])
+{
+
+	windowWidth = 640;//1280; //5:4
+	windowHeight = 480;//1024;
+
+	if(argc < 4)
+	{
+		cout<<"Not enough arguments"<<endl;
+		return 1;
 	}
 
-  /*  double pi = 3.14159265;
-    std::default_random_engine generator;
-    std::uniform_int_distribution<int> distribution(1,10);
-    
-    cout<<"Start Generating Texture Coordinates"<<endl;
+	objloader(string(argv[1]));
 
-    for(int i = 0; i < (int)points.size()/3; i++) {
-        int idx = i;
-        float r = hypot(points[3*idx+0], points[3*idx+1]);
-        float theta = atan2(points[3*idx+1], points[3*idx+0]);
-        r = min(r/maxR, 1.0f);
-        theta = max(0.0, (theta+pi)/(2*pi));
-        
-        assert(r <= 1.0);
-        assert(theta <= 1.0);
-        
-        int x = trunc(r*(h_width-1));
-        int y = trunc(theta*(h_height-1));
-        x = max(0, min(x, h_width-1));
-        y = max(0, min(y, h_height-1));
-        
-        texCordinates.push_back(heightMap[x][y]);
-        //texCordinates.push_back((float)distribution(generator)/50.0);
+
+	GLFWwindow* window;
+
+    /* Initialize the library */
+    if (!glfwInit())
+        return -1;
+
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 2);
+    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+    glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
+
+
+    /* Create a windowed mode window and its OpenGL context */
+    window = glfwCreateWindow(windowWidth, windowHeight, "Tessellation Test", NULL, NULL);
+    if (!window)
+    {
+        glfwTerminate();
+        return -1;
     }
+	glewExperimental = true;
 
-    cout<<"Done Generating Texture Coordinates"<<endl;
-*/
-/*    color.resize(points.size(), 0);
+    /* Make the window's context current */
+    glfwMakeContextCurrent(window);
 
-    for(int i = 0; i < (int)points.size()/3; i++) { 
-        color[i*3] = 1.0;
-        color[i*3+1] = 0.0;
-        color[i*3+2] = 0.0;
-    }
-*/
+	// start GLEW extension handler
+	glewInit ();
 
-	// Texture Mapping of Rusted Surface
-	/*
-	int x, y, n;
-	int force_channels = 4;
-	unsigned char* image_data  = stbi_load("texture/skullvman.png", &x, &y, &n, force_channels);
-	if (!image_data) {
-		cerr<<"ERROR: could not load the texture file"<<endl;
-	}
-	
-	// NPOT check
-	if ((x & (x - 1)) != 0 || (y & (y - 1)) != 0) {
-		cerr<<"The image size is not power of two"<<endl;
-	}
-	
-	int width_in_bytes = x * 4;
-	unsigned char *top = NULL;
-	unsigned char *bottom = NULL;
-	unsigned char temp = 0;
-	int half_height = y / 2;
+	// get version info
+	const GLubyte* renderer = glGetString (GL_RENDERER); // get renderer string
+	const GLubyte* version = glGetString (GL_VERSION); // version as a string
+	printf ("Renderer: %s\n", renderer);
+	printf ("OpenGL version supported %s\n", version);
 
-	for (int row = 0; row < half_height; row++) {
-	  top = image_data + row * width_in_bytes;
-	  bottom = image_data + (y - row - 1) * width_in_bytes;
-	  for (int col = 0; col < width_in_bytes; col++) {
-		temp = *top;
-		*top = *bottom;
-		*bottom = temp;
-		top++;
-		bottom++;
-	  }
-	}
-	
-	unsigned int tex = 0;
-	glGenTextures (1, &tex);
-	glActiveTexture (GL_TEXTURE0);
-	glBindTexture (GL_TEXTURE_2D, tex);
-	glTexImage2D (GL_TEXTURE_2D, 0, GL_RGBA, x, y, 0, GL_RGBA, GL_UNSIGNED_BYTE, image_data);
-	glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-	glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	*/
+	int max_patch_vertices = 0;
+	glGetIntegerv (GL_MAX_PATCH_VERTICES, &max_patch_vertices);
+	printf ("Max supported patch vertices %i\n", max_patch_vertices);
 
-    cout<<"Number of triangles to be rendered "<<points.size()/9<<" "<<shapes[0].mesh.indices.size()/3<<endl;
+	tessLevelInnerVal = 3.0f;
+	tessLevelOuterVal = 4.0f;
 
-    // start GL context and O/S window using GLFW helper library
-    if (glfwInit() != GL_TRUE)
-        shutDown(1);
-    if (glfwOpenWindow(window_width, window_height, 0, 0, 0, 0, 0, 0, GLFW_WINDOW) != GL_TRUE)
-        shutDown(2);
-    // start GLEW extension handler
-    glewInit();
-    // register for resize callback
-    glfwSetWindowSizeCallback(resize);
-    glfwSetMousePosCallback(updateCameraPosMouse);
+	LoadTexture(string(argv[2]));
+	Bind(GL_TEXTURE0);
 
-    // get version info
-    const GLubyte* renderer = glGetString (GL_RENDERER); // get renderer string
-    const GLubyte* version = glGetString (GL_VERSION);
-    printf("Rendered by %s\n", renderer);
-    printf("OpenGL version supported %s\n", version);
+	glActiveTexture(GL_TEXTURE1);
+	LoadTexture(string(argv[3]));
+	Bind(GL_TEXTURE1);
 
-    vbo_vertex = 0;
-    glGenBuffers (1, &vbo_vertex);
-    glBindBuffer (GL_ARRAY_BUFFER, vbo_vertex);
-    glBufferData (GL_ARRAY_BUFFER, points.size() * sizeof (GLfloat), &points[0], GL_DYNAMIC_DRAW);
+    cout<<"Generating of texture complete"<<endl;
 
-    vbo_color = 0;
-    glGenBuffers (1, &vbo_color);
-    glBindBuffer (GL_ARRAY_BUFFER, vbo_color);
-    glBufferData (GL_ARRAY_BUFFER, color.size() * sizeof (GLfloat), &color[0], GL_DYNAMIC_DRAW);
-
-    vbo_normal = 0;
-    glGenBuffers (1, &vbo_normal);
-    glBindBuffer (GL_ARRAY_BUFFER, vbo_normal);
-    glBufferData (GL_ARRAY_BUFFER, vnormals.size() * sizeof (GLfloat), &vnormals[0], GL_DYNAMIC_DRAW);
-
-    vbo_tex = 0;
-    glGenBuffers (1, &vbo_tex);
-    glBindBuffer (GL_ARRAY_BUFFER, vbo_tex);
-    glBufferData (GL_ARRAY_BUFFER, texCordinates.size() * sizeof (GLfloat), &texCordinates[0], GL_DYNAMIC_DRAW);    
-
-
-    vao = 0;
-    glGenVertexArrays (1, &vao);
-    glBindVertexArray (vao);
-
-    glBindBuffer (GL_ARRAY_BUFFER, vbo_vertex);
-    glVertexAttribPointer (0, 3, GL_FLOAT, GL_FALSE, 0, (GLubyte*) NULL);
-    glBindBuffer (GL_ARRAY_BUFFER, vbo_color);
-    glVertexAttribPointer (1, 3, GL_FLOAT, GL_FALSE, 0, (GLubyte*) NULL);
-    glBindBuffer (GL_ARRAY_BUFFER, vbo_normal);
-    glVertexAttribPointer (2, 3, GL_FLOAT, GL_FALSE, 0, (GLubyte*) NULL);
-    glBindBuffer (GL_ARRAY_BUFFER, vbo_tex);
-    glVertexAttribPointer (3, 1, GL_FLOAT, GL_FALSE, 0, (GLubyte*) NULL);
-
-
-    glEnableVertexAttribArray (0);
-    glEnableVertexAttribArray (1);
-    glEnableVertexAttribArray (2);
-    glEnableVertexAttribArray (3);
-
-    createShaderPrograms();
-    useShaderProgram();
-
-    glEnable(GL_DEPTH_TEST);
-    glDepthFunc(GL_LEQUAL);
-
-    buildView();
+	initialize();
+	buildView();
     buildProj();
     buildModel();
-    bool running = true;
 
-    draw_mode = GL_TRIANGLES;
 
-    while (running) {
-        glClear (GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	generateVertexArray();
+	generateVertexBuffer();
 
-         _update_fps_counter ();
 
-        updateCameraPosKeyboard();
+	createShaderPrograms();
+	useShaderPrograms();
 
-        buildView();
-        glUniformMatrix4fv (view_mat_location[currentProgram], 1, GL_FALSE, &view_mat[0][0]);
-        glUniformMatrix4fv (model_mat_location[currentProgram], 1, GL_FALSE, &model_mat[0][0]);
+    cout<<"Shaders compiled"<<endl;
 
-        glBindVertexArray (vao);
-        glDrawArrays (draw_mode, 0, (GLint)points.size()/3);
-        glfwSwapBuffers();
-        running = !glfwGetKey(GLFW_KEY_ESC) && glfwGetWindowParam (GLFW_OPENED);
+	cnt = 0;
+	glfwSetKeyCallback(window, keyCallback);
+	glfwSetCursorPosCallback(window, cursorCallback);
+	glfwSetWindowSizeCallback(window, resizeCallback);
+	glfwSetScrollCallback(window, scrollCallback);
+
+
+
+	GLenum drawingMode = GL_FILL;
+
+	// tell GL to only draw onto a pixel if the shape is closer to the viewer
+	glEnable (GL_DEPTH_TEST); // enable depth-testing
+//	glEnable(GL_CULL_FACE);
+	glDepthFunc (GL_LESS); // depth-testing interprets a smaller value as "closer"
+
+//    /* Loop until the user closes the window */
+    while (!glfwWindowShouldClose(window))
+    {
+//		/* Render here */
+//		// add a timer for doing animation
+//		static double previous_seconds = glfwGetTime ();
+//		double current_seconds = glfwGetTime ();
+//		elapsed_seconds = current_seconds - previous_seconds;
+//		previous_seconds = current_seconds;
+//
+//
+//		// wipe the drawing surface clear
+		glClear (GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+//
+//
+//
+		glBindVertexArray (vao);
+//		// draw points 0-3 from the currently bound VAO with current in-use shader
+		glPolygonMode(GL_FRONT_AND_BACK, drawingMode);//GL_POINT, GL_LINE, GL_FILL
+		glPatchParameteri(GL_PATCH_VERTICES,3);
+													  //glDrawArrays (GL_TRIANGLES, 0, points.size()/3.0);
+		glDrawElements(GL_PATCHES, IndexCount, GL_UNSIGNED_INT, 0);
+//
+//
+//
+//        /* Swap front and back buffers */
+		glfwSwapBuffers(window);
+//
+//        /* Poll for and process events */
+        glfwPollEvents();
+		//glEnableVertexAttribArray(0); // Disable our Vertex Array Object
+		//glBindVertexArray(0); // Disable our Vertex Buffer Object
+
+//
     }
-
-    // close GL context and any other GLFW resources
+//
     glfwTerminate();
     return 0;
+
+
 }
+

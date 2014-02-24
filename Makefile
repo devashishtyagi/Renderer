@@ -1,7 +1,7 @@
-FILES = example1.txt
+FILES = combined.obj texture/rusted_texture.bmp texture/rusted_texture.bmp
 
 all:
-	g++ -Wall -std=c++0x main.cpp def.cpp maths_funcs.cpp tinyobjloader/tiny_obj_loader.cpp imageloader/stb_image.h imageloader/stb_image.c -o main -lGLEW -lglfw -lGLU -lGL -lm
+	g++ -o main main.cpp -I/usr/include/ImageMagick `pkg-config --cflags glfw3` -Wall -std=c++11 -lGLEW -lm -lassimp -lGL -lMagick++ -lMagickCore `pkg-config --static --libs glfw3`
 run:
 	./main $(FILES)
 run-nvidia:

@@ -1,6 +1,6 @@
 #version 420
 
-//layout(binding = 0) uniform sampler2D basic_texture;
+uniform sampler2D basic_texture;
 
 in vec3 colour, position_eye, normal_eye;
 in vec2 texture_coordinates;
@@ -21,6 +21,8 @@ float specular_exponent = 100.0;
 
 
 void main () {
+    vec4 texel = texture2D(basic_texture, texture_coordinates);
+    
     // ambient intensity
     vec3 la = La*Ka;
 
@@ -40,7 +42,6 @@ void main () {
     float specular_factor = pow(dot_prod_specular, specular_exponent);
     vec3 ls = Ls*Ks*specular_factor;
 
-	//vec4 texel = texture2D (basic_texture, texture_coordinates);
-
-    frag_colour = vec4(colour, 1.0);
+	
+    frag_colour = vec4(la + ls + ld, 1.0);
 }

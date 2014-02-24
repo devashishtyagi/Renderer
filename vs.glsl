@@ -11,7 +11,7 @@ out float depth;
 uniform mat4 view, proj, model, orig_model_mat;
 
 void main () {
-	texture_coordinates = vec2(colour.r, colour.g);
+	texture_coordinates = vec2(vertex_colour.r, vertex_colour.g);
     colour = vertex_colour;
     vec3 vertex_nrml = normalize(vertex_normal);
     position_eye = vec3(view*model*vec4(vertex_position, 1.0));
