@@ -1,21 +1,23 @@
-#version 420
+#version 410
 
 layout(location = 0) in vec3 vertex_position;
 layout(location = 1) in vec3 vertex_colour;
 layout(location = 2) in vec3 vertex_normal;
-layout(location = 3) in float displace;
+layout(location = 3) in vec2 texCordinates;
 
-out vec3 colour, position_eye, normal_eye;
-out vec2 texture_coordinates;
-out float depth;
-uniform mat4 view, proj, model, orig_model_mat;
+
+out vec3 controlpoint_wor;
+out vec3 normaltcs;
+out vec2 textcs;
+out vec3 colourvs;
+
+uniform mat4 model;
 
 void main () {
-	texture_coordinates = vec2(vertex_colour.r, vertex_colour.g);
-    colour = vertex_colour;
-    vec3 vertex_nrml = normalize(vertex_normal);
-    position_eye = vec3(view*model*vec4(vertex_position, 1.0));
-    normal_eye = vec3(view*model*vec4(vertex_nrml, 0.0));
-    gl_Position = proj * view * model * vec4 (vertex_position, 1.0);
-    depth = abs(gl_Position.z);
+	//controlpoint_wor = (model * vec4 (vertex_position, 1.0)).xyz;
+	//normaltcs = (model * vec4(vertex_normal.xyz,1.0)).xyz;
+	controlpoint_wor = vertex_position;
+    normaltcs = vertex_normal;
+    textcs = texCordinates;
+	colourvs = vertex_colour;
 }

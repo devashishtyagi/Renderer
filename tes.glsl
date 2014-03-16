@@ -17,7 +17,7 @@ vec3 WorldPos_FS_in;
 vec3 Normal_FS_in;
 out vec2 TexCoord_FS_in;
 
-uniform mat4 view, proj;
+uniform mat4 model, view, proj;
 
 // gl_TessCoord is location within the patch
 // (barycentric for triangles, UV for quads)
@@ -45,5 +45,5 @@ void main () {
 	// Displace the vertex along the normal
     float Displacement = texture(gDisplacementMap, TexCoord_FS_in.xy).x;
     WorldPos_FS_in += Normal_FS_in * Displacement * 0.25;
-	gl_Position =  proj * view * vec4 (WorldPos_FS_in, 1.0);
+	gl_Position =  proj * view * model * vec4 (WorldPos_FS_in, 1.0);
 }
