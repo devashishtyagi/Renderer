@@ -7,6 +7,8 @@ layout (vertices = 3) out;
 in vec3 controlpoint_wor[];
 in vec3 colourvs[];
 in vec3 normaltcs[];
+in vec3 tangenttcs[];
+in vec3 bitangenttcs[];
 in vec2 textcs[];
 
 
@@ -14,6 +16,8 @@ in vec2 textcs[];
 out vec3 evaluationpoint_wor[];
 out vec3 colourtcs[];
 out vec3 normaltes[];
+out vec3 tangenttes[];
+out vec3 bitangenttes[];
 out vec2 textes[];
 
 
@@ -26,6 +30,8 @@ void main () {
 	evaluationpoint_wor[gl_InvocationID] = controlpoint_wor[gl_InvocationID];
 	colourtcs[gl_InvocationID] = colourvs[gl_InvocationID];
 	normaltes[gl_InvocationID] = normaltcs[gl_InvocationID];
+    tangenttes[gl_InvocationID] = tangenttcs[gl_InvocationID];
+    bitangenttes[gl_InvocationID] = bitangenttcs[gl_InvocationID];
 	textes[gl_InvocationID] = textcs[gl_InvocationID];
 
 		

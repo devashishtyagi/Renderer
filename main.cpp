@@ -42,7 +42,7 @@ vector<vector<pair<int,pair<int,int> > > > height_map(h_width,vector<pair<int,pa
 
 static uint shaderProgramme;
 
-static uint vboVertex,vboColor,vboNormal,vboTex,indices;
+static uint vboVertex,vboColor,vboNormal,vboTex,vboTangent, indices;
 static uint vao;
 
 static uint tessLevelInner, tessLevelOuter;
@@ -65,6 +65,7 @@ vector<GLfloat> color;
 //};
 
 vector<GLfloat> vnormals;
+vector<GLfloat> vtangents;
 vector<GLfloat> displacements;
 vector<GLfloat> texCordinates;
 
@@ -89,7 +90,7 @@ glm::mat4 view_mat = glm::mat4();
 glm::mat4 proj_mat = glm::mat4();
 glm::mat4 model_mat = glm::mat4();
 
-int view,proj,model,originalModel,colorMap,displacementMap;
+int view,proj,model,originalModel,colorMap,displacementMap, normalMap;
 
 glm::fquat orientationQuaternion_;
 
@@ -104,9 +105,12 @@ float fov = 75.0f;
 Magick::Image* m_pImage;
 Magick::Blob m_blob;
 
+Magick::Image* m_pNormalMap;
+Magick::Blob m_blob_normal;
+
 GLenum m_textureTarget;
 GLuint m_textureObj;
-
+GLuint m_normalMapObj;
 
 
 void initialize()
@@ -148,11 +152,16 @@ void buildModel() {
 
 
 
-static void checkError(GLint status, const char *msg)
+static void checkError(GLint status, unsigned int shader_index, const char *msg)
 {
     if (!status)
     {
         printf("%s\n", msg);
+        int max_length = 2048;
+        int actual_length = 0;
+        char log[2048];
+        glGetShaderInfoLog (shader_index, max_length, &actual_length, log);
+        printf ("shader info log for GL index %i:\n%s\n", shader_index, log);
         exit(EXIT_FAILURE);
     }
 }
@@ -192,7 +201,7 @@ void useShaderPrograms(){
     glUniformMatrix4fv (model, 1, GL_FALSE, &model_mat[0][0]);
     glUniform1i(colorMap, 0);
     glUniform1i(displacementMap,1);
-
+    glUniform1i(normalMap, 2);
     //	glUniformMatrix4fv (originalModel[prog], 1, GL_FALSE, &model_mat[0][0] );
 
 
@@ -209,7 +218,7 @@ void createShaderPrograms() {
     glCompileShader (vs);
     int params = -1;
     glGetShaderiv(vs,GL_COMPILE_STATUS,&params);
-    checkError(params,"Vertex Shader not compiled");
+    checkError(params, vs, "Vertex Shader not compiled");
 
     string TessellationControlShader = textFileRead ("tcs.glsl");
     GLuint tcs = glCreateShader (GL_TESS_CONTROL_SHADER);
@@ -218,7 +227,7 @@ void createShaderPrograms() {
     glCompileShader (tcs);
     params = -1;
     glGetShaderiv(tcs,GL_COMPILE_STATUS,&params);
-    checkError(params,"Tessellation Control not compiled");
+    checkError(params, tcs, "Tessellation Control not compiled");
 
     string TessellationEvaluationShader = textFileRead ("tes.glsl");
     GLuint tes = glCreateShader (GL_TESS_EVALUATION_SHADER);
@@ -227,7 +236,7 @@ void createShaderPrograms() {
     glCompileShader (tes);
     params = -1;
     glGetShaderiv(tes,GL_COMPILE_STATUS,&params);
-    checkError(params,"Tessellation Evaluation not compiled");
+    checkError(params, tes, "Tessellation Evaluation not compiled");
 
     string fragment_shader = textFileRead ("fs.glsl");
     GLuint fs = glCreateShader (GL_FRAGMENT_SHADER);
@@ -236,7 +245,7 @@ void createShaderPrograms() {
     glCompileShader (fs);
     params = -1;
     glGetShaderiv(fs,GL_COMPILE_STATUS,&params);
-    checkError(params,"Fragment Shader not compiled");
+    checkError(params, fs, "Fragment Shader not compiled");
 
 
     shaderProgramme = glCreateProgram ();
@@ -266,6 +275,7 @@ void createShaderPrograms() {
     model = glGetUniformLocation (shaderProgramme, "model");
     colorMap = glGetUniformLocation(shaderProgramme, "gColorMap");
     displacementMap = glGetUniformLocation(shaderProgramme, "gDisplacementMap");
+    normalMap = glGetUniformLocation(shaderProgramme, "gNormalMap");
     //	originalModel = glGetUniformLocation(shaderProgramme[i], "orig_model_mat");
 
 }
@@ -310,6 +320,13 @@ void generateVertexBuffer(){
     glBufferData (GL_ARRAY_BUFFER, texCordinates.size() * sizeof (GLfloat), &texCordinates[0], GL_STATIC_DRAW);
     glEnableVertexAttribArray(3);
     glVertexAttribPointer(3, 2, GL_FLOAT, GL_FALSE, 0, 0);
+
+    vboTangent = 0;
+    glGenBuffers (1, &vboTangent);
+    glBindBuffer (GL_ARRAY_BUFFER, vboTangent);
+    glBufferData (GL_ARRAY_BUFFER, vtangents.size() * sizeof (GLfloat), &vtangents[0], GL_STATIC_DRAW);
+    glEnableVertexAttribArray(4);
+    glVertexAttribPointer(4, 4, GL_FLOAT, GL_FALSE, 0, NULL);
 }
 
 void generateVertexArray(){
@@ -370,9 +387,10 @@ void initMesh(unsigned int Index, const aiMesh* paiMesh)
 
     for (unsigned int i = 0 ; i < paiMesh->mNumVertices ; i++) {
         const aiVector3D* pPos      = &(paiMesh->mVertices[i]);
-        const aiVector3D* pNormal   = paiMesh->HasNormals() ?  &(paiMesh->mNormals[i]):&Zero3D ;
+        const aiVector3D* pNormal   = paiMesh->HasNormals() ?  &(paiMesh->mNormals[i]) : &Zero3D ;
+        const aiVector3D* pTangent = paiMesh->HasTangentsAndBitangents() ? &(paiMesh->mTangents[i]) : &Zero3D;
+        const aiVector3D* pBitangent = paiMesh->HasTangentsAndBitangents() ? &(paiMesh->mBitangents[i]) : &Zero3D;
         const aiVector3D* pTexCoord = paiMesh->HasTextureCoords(0) ? &(paiMesh->mTextureCoords[0][i]) : &Zero3D;
-
 
         points.push_back(pPos->x);
         points.push_back(pPos->y);
@@ -380,6 +398,8 @@ void initMesh(unsigned int Index, const aiMesh* paiMesh)
 
         texCordinates.push_back(pTexCoord->x);
         texCordinates.push_back(pTexCoord->y);
+
+        //cout<<pTexCoord->x<<" "<<pTexCoord->y<<endl;
 
         vnormals.push_back(pNormal->x);
         vnormals.push_back(pNormal->y);
@@ -389,6 +409,27 @@ void initMesh(unsigned int Index, const aiMesh* paiMesh)
         color.push_back(pTexCoord->y);
         color.push_back(0.0f);
 
+        glm::vec3 t(pTangent->x, pTangent->y, pTangent->z);
+        glm::vec3 n(pNormal->x, pNormal->y, pNormal->z);
+        glm::vec3 b(pBitangent->x, pBitangent->y, pBitangent->z);
+
+        /* orthogonalize and normalize the tangent so we can use it in something approximating 
+         * a T,N,B inverse matrix */
+        glm::vec3 t_i = glm::normalize(t - n * glm::dot(n, t));
+        
+        /* get determinant of T,B,N 3x3 matrix by dot*cross method */
+        float det = (glm::dot ( glm::cross(n,t) , b ) );
+        if (det < 0.0f)
+            det = -1.0f;
+        else
+            det = 1.0f;
+
+        /* push back normalized tangent along with determinant value */
+        vtangents.push_back(t_i.x);
+        vtangents.push_back(t_i.y);
+        vtangents.push_back(t_i.z);
+        vtangents.push_back(det);
+
     }
     cout<<paiMesh->mNumFaces<<endl;
     for (unsigned int i = 0 ; i < paiMesh->mNumFaces ; i++) {
@@ -397,19 +438,14 @@ void initMesh(unsigned int Index, const aiMesh* paiMesh)
         ind.push_back(Face.mIndices[0]);
         ind.push_back(Face.mIndices[1]);
         ind.push_back(Face.mIndices[2]);
-
     }
-
-
 }
-
-
 
 void objloader(string fileName){
 
     Assimp::Importer Importer;
 
-    const aiScene* pScene = Importer.ReadFile(fileName.c_str(), aiProcess_JoinIdenticalVertices);
+    const aiScene* pScene = Importer.ReadFile(fileName.c_str(), aiProcess_JoinIdenticalVertices | aiProcess_CalcTangentSpace);
 
     points.clear();
     vnormals.clear();
@@ -536,7 +572,7 @@ int main(int argc, const char * argv[])
     windowWidth = 640;
     windowHeight = 480;
 
-    if(argc < 4)
+    if(argc < 5)
     {
         cout<<"Not enough arguments"<<endl;
         return 1;
@@ -582,8 +618,8 @@ int main(int argc, const char * argv[])
     glGetIntegerv (GL_MAX_PATCH_VERTICES, &max_patch_vertices);
     printf ("Max supported patch vertices %i\n", max_patch_vertices);
 
-    tessLevelInnerVal = 3.0f;
-    tessLevelOuterVal = 4.0f;
+    tessLevelInnerVal = 30.0f;
+    tessLevelOuterVal = 30.0f;
 
     LoadTexture(string(argv[2]));
     Bind(GL_TEXTURE0);
@@ -591,6 +627,10 @@ int main(int argc, const char * argv[])
     glActiveTexture(GL_TEXTURE1);
     LoadTexture(string(argv[3]));
     Bind(GL_TEXTURE1);
+
+    glActiveTexture(GL_TEXTURE2);
+    LoadTexture(string(argv[4]));
+    Bind(GL_TEXTURE2);
 
     cout<<"Generating of texture complete"<<endl;
 
@@ -627,6 +667,7 @@ int main(int argc, const char * argv[])
     /* Loop until the user closes the window */
     while (!glfwWindowShouldClose(window))
     {
+        
         glClear (GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         
         glBindVertexArray (vao);
@@ -645,7 +686,5 @@ int main(int argc, const char * argv[])
     
     glfwTerminate();
     return 0;
-
-
 }
 
