@@ -11,8 +11,10 @@
 #include <vector>
 #include <cstdio>
 #include <cassert>
+#include <cmath>
 
 
+#define GLM_FORCE_RADIANS
 
 #include "GL/glew.h"
 #include "GLFW/glfw3.h"
@@ -42,12 +44,14 @@ vector<vector<pair<int,pair<int,int> > > > height_map(h_width,vector<pair<int,pa
 
 static uint shaderProgramme;
 
-static uint vboVertex,vboColor,vboNormal,vboTex,vboTangent, indices;
+static uint vboVertex, vboColor, vboNormal, vboTex, vboTangent, vboTNormals, vboWeathering, vboWeatheringNeighbour, indices;
 static uint vao;
 
 static uint tessLevelInner, tessLevelOuter;
+static uint weatheringMapH,weatheringMapW;
 
 float tessLevelInnerVal, tessLevelOuterVal;
+float WeatheringMapHeight, WeatheringMapWidth;
 
 glm::vec3 ball_position(0.0f, 0.0f, 0.0f);
 
@@ -66,13 +70,17 @@ vector<GLfloat> color;
 
 vector<GLfloat> vnormals;
 vector<GLfloat> vtangents;
+vector<GLfloat> tnormals;
 vector<GLfloat> displacements;
 vector<GLfloat> texCordinates;
-
+vector<GLfloat> weathering_degree;
+vector<GLfloat> weathering_degree_neighbour;
 vector<int> ind;
 //= {
 //	0,1,2
 //};
+int vertex_neighbours;
+
 
 
 static GLsizei IndexCount;
@@ -90,17 +98,19 @@ glm::mat4 view_mat = glm::mat4();
 glm::mat4 proj_mat = glm::mat4();
 glm::mat4 model_mat = glm::mat4();
 
-int view,proj,model,originalModel,colorMap,displacementMap, normalMap;
+int view, proj, model, originalModel, weatheringMap, colorMap, displacementMap, normalMap ;
 
-glm::fquat orientationQuaternion_;
+glm::fquat orientationQuaternion_, currentQuaternion;
 
 double mouseX = 1;
 double mouseY = 0;
 
+bool mouse_pressed = false;
+
 // Projection parameters
 float near = 1.0f;  // near clipping plane
 float far = 100.0f; // far clipping plane
-float fov = 75.0f;
+float fov = glm::radians(75.0f);
 
 Magick::Image* m_pImage;
 Magick::Blob m_blob;
@@ -113,29 +123,7 @@ GLuint m_textureObj;
 GLuint m_normalMapObj;
 
 
-void initialize()
-{
-    orientationQuaternion_ = glm::quat();
-    orientationQuaternion_ = glm::normalize(orientationQuaternion_);
-
-}
-void rotateit(const glm::detail::float32& degrees, const glm::vec3& axis)
-{
-    //    if ( axis == glm::vec3(0.0f, 1.0f, 0.0f) )
-    //        orientationQuaternion_ =  glm::normalize(glm::angleAxis(degrees, axis)) * orientationQuaternion_;
-    //    else
-    //	{
-    orientationQuaternion_ =  glm::normalize(glm::angleAxis(degrees, axis)) *  orientationQuaternion_;
-
-    //	}
-}
-
 void buildView() {
-
-    //	glm::quat temp = glm::conjugate(orientationQuaternion_);
-    //view_mat = glm::mat4_cast(temp);
-    //	view_mat = glm::mat4(1);
-    //	view_mat = glm::translate(view_mat, glm::vec3(-cam_pos[0], -cam_pos[1], -cam_pos[2]));
     view_mat = glm::lookAt(cam_pos, glm::vec3(0.0, 0.0, 0.0), glm::vec3(0.0, 1.0, 0.0));
 
 }
@@ -148,9 +136,6 @@ void buildProj() {
 void buildModel() {
     model_mat = glm::mat4(1.0f);
 }
-
-
-
 
 static void checkError(GLint status, unsigned int shader_index, const char *msg)
 {
@@ -193,16 +178,19 @@ void useShaderPrograms(){
     //	glUniformMatrix4fv (proj[prog], 1, GL_FALSE, &proj_mat[0][0]);
     //	glUniformMatrix4fv (model[prog], 1, GL_FALSE, &model_mat[0][0]);
     //	glUniformMatrix4fv (originalModel[prog], 1, GL_FALSE, &model_mat[0][0] );
-
+    glUniform1f(weatheringMapH,WeatheringMapHeight);//, WeatheringMapWidth);
+    glUniform1f(weatheringMapW,WeatheringMapWidth);
     glUniform1f(tessLevelInner, tessLevelInnerVal);
     glUniform1f(tessLevelOuter, tessLevelOuterVal);
     glUniformMatrix4fv (view, 1, GL_FALSE, &view_mat[0][0]);
     glUniformMatrix4fv (proj, 1, GL_FALSE, &proj_mat[0][0]);
     glUniformMatrix4fv (model, 1, GL_FALSE, &model_mat[0][0]);
-    glUniform1i(colorMap, 0);
-    glUniform1i(displacementMap,1);
-    glUniform1i(normalMap, 2);
+    glUniform1i(weatheringMap, 0);
+    glUniform1i(colorMap, 1);
+    glUniform1i(displacementMap,2);
+    glUniform1i(normalMap, 3);
     //	glUniformMatrix4fv (originalModel[prog], 1, GL_FALSE, &model_mat[0][0] );
+    cout<<weatheringMapW<<endl;
 
 
 
@@ -269,10 +257,13 @@ void createShaderPrograms() {
 
     tessLevelInner = glGetUniformLocation (shaderProgramme, "tessLevelInner");
     tessLevelOuter = glGetUniformLocation (shaderProgramme, "tessLevelOuter");
-
+    weatheringMapH = glGetUniformLocation (shaderProgramme, "weatheringMapH");
+    weatheringMapW = glGetUniformLocation (shaderProgramme, "weatheringMapW");
+    
     view = glGetUniformLocation (shaderProgramme, "view");
     proj = glGetUniformLocation (shaderProgramme, "proj");
     model = glGetUniformLocation (shaderProgramme, "model");
+    weatheringMap = glGetUniformLocation(shaderProgramme, "gWeatheringMap");
     colorMap = glGetUniformLocation(shaderProgramme, "gColorMap");
     displacementMap = glGetUniformLocation(shaderProgramme, "gDisplacementMap");
     normalMap = glGetUniformLocation(shaderProgramme, "gNormalMap");
@@ -327,6 +318,31 @@ void generateVertexBuffer(){
     glBufferData (GL_ARRAY_BUFFER, vtangents.size() * sizeof (GLfloat), &vtangents[0], GL_STATIC_DRAW);
     glEnableVertexAttribArray(4);
     glVertexAttribPointer(4, 4, GL_FLOAT, GL_FALSE, 0, NULL);
+
+
+    vboTNormals = 0;
+    glGenBuffers (1, &vboTNormals);
+    glBindBuffer (GL_ARRAY_BUFFER, vboTNormals);
+    glBufferData (GL_ARRAY_BUFFER, tnormals.size() * sizeof (GLfloat), &tnormals[0], GL_STATIC_DRAW);
+    glEnableVertexAttribArray(5);
+    glVertexAttribPointer(5, 3, GL_FLOAT, GL_FALSE, 0, 0);
+
+    /*
+    vboWeathering = 0;
+    glGenBuffers (1, &vboWeathering);
+    glBindBuffer (GL_ARRAY_BUFFER, vboWeathering);
+    glBufferData (GL_ARRAY_BUFFER, weathering_degree.size() * sizeof (GLfloat), &weathering_degree[0], GL_STATIC_DRAW);
+    glEnableVertexAttribArray(6);
+    glVertexAttribPointer(6, 1, GL_FLOAT, GL_FALSE, 0, 0);
+
+
+    vboWeatheringNeighbour = 0;
+    glGenBuffers (1, &vboWeatheringNeighbour);
+    glBindBuffer (GL_ARRAY_BUFFER, vboWeatheringNeighbour);
+    glBufferData (GL_ARRAY_BUFFER, weathering_degree_neighbour.size() * sizeof (GLfloat), &weathering_degree_neighbour[0], GL_STATIC_DRAW);
+    glEnableVertexAttribArray(7);
+    glVertexAttribPointer(7, vertex_neighbours, GL_FLOAT, GL_FALSE, 0, 0);    
+    */
 }
 
 void generateVertexArray(){
@@ -459,7 +475,156 @@ void objloader(string fileName){
         initMesh(i, paiMesh);
     }
 
-    cout<<ind.size()<<" "<<points.size()<<endl;
+    cout<<ind.size()/3<<" "<<points.size()/3<<endl;
+}
+
+void readWethearingDegree(string fileName) {
+    ifstream infile(fileName);
+    unsigned int num_vertices = points.size()/3;
+
+    weathering_degree.clear();
+
+    int vertices, neighbours;
+    neighbours = 0;
+    infile>>vertices;
+
+    vertex_neighbours = neighbours;
+
+    for(unsigned int i = 0; i < num_vertices; i++) {
+        GLfloat val;
+        if (infile>>val) {
+            weathering_degree.push_back(val);
+            for(int j = 0; j < neighbours; j++) {
+                infile>>val;
+                weathering_degree_neighbour.push_back(val);
+            }
+        }
+        else {
+            cout<<"Insufficient number of points in weathering degree file "<<fileName<<endl;
+            break;
+        }
+    }
+}
+
+void plyLoader(string fileName, string objFile) {
+    Assimp::Importer importer;
+
+    const aiScene* scene = importer.ReadFile(fileName.c_str(), aiProcess_JoinIdenticalVertices );
+
+    if (!scene) {
+        cout<<importer.GetErrorString()<<endl;
+    }
+    else {
+
+        points.clear();
+        color.clear();
+        vnormals.clear();
+        vtangents.clear();
+        tnormals.clear();
+        ind.clear();
+
+        for(unsigned int i = 0; i < scene->mNumMeshes; i++) {
+            const aiMesh* mesh = scene->mMeshes[i];
+
+            cout<<"PLY Mesh Count "<<mesh->mNumVertices<<endl;
+
+            // cout<<mesh->GetNumColorChannels()<<endl;
+            // cout<<mesh->HasVertexColors(0)<<endl;
+            // cout<<mesh->HasNormals()<<endl;
+
+            for(unsigned int j = 0; j < mesh->mNumVertices; j++) {
+
+                const aiVector3D* pos = &(mesh->mVertices[j]);
+                const aiColor4D* col = &(mesh->mColors[0][j]);
+                const aiVector3D* nrml = &(mesh->mNormals[j]);
+
+                // cout<<pos->x<<" "<<pos->y<<" "<<pos->z<<endl;
+                // cout<<col->r<<" "<<col->g<<" "<<col->b<<endl;
+                // cout<<nrml->x<<" "<<nrml->y<<" "<<nrml->z<<endl;
+
+                points.push_back(pos->x); points.push_back(pos->y); points.push_back(pos->z);
+                //color.push_back(col->r/255.0); color.push_back(col->g/255.0); color.push_back(col->b/255.0);
+                color.push_back(abs(pos->x)); color.push_back(0.0); color.push_back(0.0);
+                tnormals.push_back(nrml->x); tnormals.push_back(nrml->y); tnormals.push_back(nrml->z);
+            }
+
+            for (unsigned int i = 0 ; i < mesh->mNumFaces ; i++) {
+                const aiFace& Face = mesh->mFaces[i];
+                if (Face.mNumIndices != 3)
+                    continue;
+                ind.push_back(Face.mIndices[0]);
+                ind.push_back(Face.mIndices[1]);
+                ind.push_back(Face.mIndices[2]);
+            }   
+        }
+    }
+
+    const aiScene* objscene = importer.ReadFile(objFile.c_str(), aiProcess_JoinIdenticalVertices | aiProcess_CalcTangentSpace);
+
+    if (!objscene) {
+        cout<<importer.GetErrorString()<<endl;
+    }
+    else {
+        for(unsigned int i = 0; i < objscene->mNumMeshes; i++) {
+            const aiMesh* mesh = objscene->mMeshes[i];
+
+            cout<<"OBJ Mesh Count "<<mesh->mNumVertices<<endl;
+
+            const aiVector3D Zero3D(1.0f, 0.0f, 0.0f);
+            for(unsigned int i = 0; i < mesh->mNumVertices; i++) {
+//                cout<<"index "<<i<<endl;
+                const aiVector3D* pNormal   = mesh->HasNormals() ?  &(mesh->mNormals[i]) : &Zero3D ;
+                const aiVector3D* pTangent = mesh->HasTangentsAndBitangents() ? &(mesh->mTangents[i]) : &Zero3D;
+                const aiVector3D* pBitangent = mesh->HasTangentsAndBitangents() ? &(mesh->mBitangents[i]) : &Zero3D;
+                const aiVector3D* texcoord = mesh->HasTextureCoords(0) ? &(mesh->mTextureCoords[0][i]) : &Zero3D;
+
+                if (isnan(pTangent->x)) {
+                    pTangent = &Zero3D;
+                    pBitangent = &Zero3D;
+                }
+
+//                cout<<pNormal->x<<" "<<pNormal->y<<" "<<pNormal->z<<endl;
+//                cout<<texcoord->x<<" "<<texcoord->y<<endl;
+//                cout<<pTangent->x<<" "<<pTangent->y<<" "<<pTangent->z<<endl;
+//                cout<<pBitangent->x<<" "<<pBitangent->y<<" "<<pBitangent->z<<endl;
+
+
+                // Generate vtangents
+                glm::vec3 t(pTangent->x, pTangent->y, pTangent->z);
+                glm::vec3 n(pNormal->x, pNormal->y, pNormal->z);
+                glm::vec3 b(pBitangent->x, pBitangent->y, pBitangent->z);
+
+                /* orthogonalize and normalize the tangent so we can use it in something approximating
+                 * a T,N,B inverse matrix */
+                glm::vec3 t_i = glm::normalize(t - n * glm::dot(n, t));
+                
+                /* get determinant of T,B,N 3x3 matrix by dot*cross method */
+                float det = (glm::dot ( glm::cross(n,t) , b ) );
+                if (det < 0.0f)
+                    det = -1.0f;
+                else
+                    det = 1.0f;
+
+                /* push back normalized tangent along with determinant value */
+                vtangents.push_back(t_i.x);
+                vtangents.push_back(t_i.y);
+                vtangents.push_back(t_i.z);
+                vtangents.push_back(det);
+
+                // push back vertex normals
+                vnormals.push_back(n.x);
+                vnormals.push_back(n.y);
+                vnormals.push_back(n.z);
+
+                // push back texture coordinates
+                texCordinates.push_back(texcoord->x);
+                texCordinates.push_back(texcoord->y);
+
+            }
+        }
+
+        cout<<"Number of face "<<ind.size()/3<<"  and total number of points "<<points.size()/3<<endl;
+    }
 }
 
 bool LoadTexture(const std::string& fileName){
@@ -476,6 +641,31 @@ bool LoadTexture(const std::string& fileName){
     glGenTextures(1, &m_textureObj);
     glBindTexture(m_textureTarget, m_textureObj);
     glTexImage2D(m_textureTarget, 0, GL_RGBA, m_pImage->columns(), m_pImage->rows(), 0, GL_RGBA, GL_UNSIGNED_BYTE, m_blob.data());
+    glTexParameterf(m_textureTarget, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameterf(m_textureTarget, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+    return true;
+}
+
+bool LoadWeatheringTexture(const std::string& fileName) {
+    ifstream infile(fileName);
+    int wmx, wmy;
+    infile>>wmx>>wmy;
+    GLfloat weatheringDegree[wmx*wmy];
+    WeatheringMapHeight = wmx;
+    WeatheringMapWidth = wmy;
+
+    cout<<WeatheringMapHeight<<" "<<WeatheringMapWidth<<endl;
+    for(int i = 0; i < wmx; i++) {
+        for(int j = 0; j < wmy; j++)
+            infile>>weatheringDegree[i*wmy + j];
+    }
+
+    m_textureObj = 0;
+    m_textureTarget = GL_TEXTURE_2D;
+    glGenTextures(1, &m_textureObj);
+    glBindTexture(m_textureTarget, m_textureObj);
+    glTexImage2D(m_textureTarget, 0, GL_RED, wmx, wmy, 0, GL_RED, GL_FLOAT, (void*)weatheringDegree);
     glTexParameterf(m_textureTarget, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameterf(m_textureTarget, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
@@ -514,41 +704,102 @@ static void keyCallback(GLFWwindow* window, int key, int scancode, int action, i
         model_mat = glm::scale(glm::mat4(1.0f), glm::vec3(0.5f));
         glUniformMatrix4fv(model, 1, GL_FALSE, glm::value_ptr(model_mat));
     }
+
+    if (key == GLFW_KEY_KP_ADD && action == GLFW_PRESS) {
+        tessLevelInnerVal += 10.0f;
+        tessLevelOuterVal += 10.0f;
+        glUniform1f(tessLevelInner, tessLevelInnerVal);
+        glUniform1f(tessLevelOuter, tessLevelOuterVal);
+    }
+
+    if (key == GLFW_KEY_KP_SUBTRACT && action == GLFW_PRESS) {
+        tessLevelInnerVal -= 10.0f;
+        tessLevelOuterVal -= 10.0f;
+        glUniform1f(tessLevelInner, tessLevelInnerVal);
+        glUniform1f(tessLevelOuter, tessLevelOuterVal);        
+    }
 }
 
+void initializeQuat()
+{
+    orientationQuaternion_ = glm::quat();
+    orientationQuaternion_ = glm::normalize(orientationQuaternion_);
+    currentQuaternion = glm::quat();
+    currentQuaternion = glm::normalize(currentQuaternion);
+}
+
+glm::quat RotationBetweenVectors(glm::vec3 start, glm::vec3 dest){
+    start = glm::normalize(start);
+    dest = glm::normalize(dest);
+ 
+    float cosTheta = glm::dot(start, dest);
+    glm::vec3 rotationAxis;
+ 
+    if (cosTheta < -1 + 0.001f){
+        // special case when vectors in opposite directions:
+        // there is no "ideal" rotation axis
+        // So guess one; any will do as long as it's perpendicular to start
+        rotationAxis = glm::cross(glm::vec3(0.0f, 0.0f, 1.0f), start);
+        if (glm::length2(rotationAxis) < 0.01 ) // bad luck, they were parallel, try again!
+            rotationAxis = glm::cross(glm::vec3(1.0f, 0.0f, 0.0f), start);
+ 
+        rotationAxis = glm::normalize(rotationAxis);
+        return glm::angleAxis(180.0f, rotationAxis);
+    }
+ 
+    rotationAxis = glm::cross(start, dest);
+ 
+    
+    float s = sqrt( (1+cosTheta)*2 );
+    float invs = 1 / s;
+ 
+    return glm::quat(
+        s * 0.5f, 
+        rotationAxis.x * invs,
+        rotationAxis.y * invs,
+        rotationAxis.z * invs
+    );
+ 
+}
 
 static void cursorCallback(GLFWwindow* window, double x, double y){
     int state = glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_1);
 
     if (state == GLFW_PRESS) {
 
-        static glm::vec3 V2(0.0, 0.0, 0.0);
+        static glm::vec3 start(0.0, 0.0, 0.0);
+        
         double mouse_x = (x/(double)windowWidth)*2-1;
         double mouse_y = 1-(y/double(windowHeight))*2;
-        if(mouse_x*mouse_x + mouse_y*mouse_y < 0.0001) return;
-        glm::vec3 ballMovement = glm::vec3(mouse_x,mouse_y,0);
-        ball_position = ball_position + ballMovement;
+        
+        if(pow(mouse_x, 2) + pow(mouse_y, 2) > 1.0) 
+            return;
+        
+        glm::vec3 dest = glm::vec3(mouse_x, mouse_y, sqrt(1.0 - pow(mouse_x,2) - pow(mouse_y,2)));
 
-        float speed = glm::l1Norm(ballMovement);
+        if (mouse_pressed == false) {
+            start = dest;
+            mouse_pressed = true;
+            return;
+        }
 
-        glm::vec3 downwards  = glm::vec3(0.0f, 0.0f, 1.0f);
-        glm::vec3 rotationAxis = glm::normalize(glm::cross(downwards, ballMovement));
+        float sensitivity = 0.3;
 
-        //glm::fquat rotation = glm::normalize(glm::angleAxis(speed, rotationAxis));
-        glm::vec3 am(0.0f,-1.0f,0.0);
-        //	rotateit(speed/5.0f, am);
-        //	buildView();
-        //	glUniformMatrix4fv (view[prog], 1, GL_FALSE, &view_mat[0][0]);
-        model_mat = glm::rotate(model_mat, speed, rotationAxis);
-        glUniformMatrix4fv(model,1,GL_FALSE,&model_mat[0][0]);
+        glm::quat relativeQuat = glm::normalize(RotationBetweenVectors(start, dest));
+        orientationQuaternion_ = relativeQuat*orientationQuaternion_;
 
+        // control sensitivity
+        orientationQuaternion_ = glm::slerp(currentQuaternion, orientationQuaternion_, sensitivity);
+    }
+    else {
+        mouse_pressed = false;
     }
 }
 
 void scrollCallback(GLFWwindow* window, double xoff, double yoff){
-    cam_pos.z += yoff;
+    cam_pos.z += yoff/10.0f;
     if (cam_pos == glm::vec3(0.0, 0.0, 0.0)) {
-			cam_pos.z += yoff;
+			cam_pos.z += yoff/10.0f;
 	}
     buildView();
     glUniformMatrix4fv(view,1,GL_FALSE,&view_mat[0][0]);
@@ -564,7 +815,21 @@ static void resizeCallback(GLFWwindow* window,int width, int height){
 	glViewport(0, 0, width, height);
 }
 
-
+void _update_fps_counter (GLFWwindow* window) {
+  static double previous_seconds = glfwGetTime ();
+  static int frame_count;
+  double current_seconds = glfwGetTime ();
+  double elapsed_seconds = current_seconds - previous_seconds;
+  if (elapsed_seconds > 0.25) {
+    previous_seconds = current_seconds;
+    double fps = (double)frame_count / elapsed_seconds;
+    char tmp[128];
+    sprintf (tmp, "opengl @ fps: %.2f", fps);
+    glfwSetWindowTitle (window, tmp);
+    frame_count = 0;
+  }
+  frame_count++;
+}
 
 int main(int argc, const char * argv[])
 {
@@ -572,14 +837,15 @@ int main(int argc, const char * argv[])
     windowWidth = 640;
     windowHeight = 480;
 
-    if(argc < 5)
+    if(argc < 7)
     {
         cout<<"Not enough arguments"<<endl;
         return 1;
     }
-
-    objloader(string(argv[1]));
-
+    
+    plyLoader(string(argv[1]), string(argv[2]));
+    //objloader(string(argv[2]));
+    //readWethearingDegree(string(argv[3]));
 
     GLFWwindow* window;
 
@@ -618,23 +884,31 @@ int main(int argc, const char * argv[])
     glGetIntegerv (GL_MAX_PATCH_VERTICES, &max_patch_vertices);
     printf ("Max supported patch vertices %i\n", max_patch_vertices);
 
-    tessLevelInnerVal = 30.0f;
-    tessLevelOuterVal = 30.0f;
+    tessLevelInnerVal = 1.0f;
+    tessLevelOuterVal = 1.0f;
 
-    LoadTexture(string(argv[2]));
+// No textures needed as of now
+
+
+    LoadWeatheringTexture(string(argv[4]));
     Bind(GL_TEXTURE0);
 
     glActiveTexture(GL_TEXTURE1);
-    LoadTexture(string(argv[3]));
+    LoadTexture(string(argv[5]));
     Bind(GL_TEXTURE1);
 
     glActiveTexture(GL_TEXTURE2);
-    LoadTexture(string(argv[4]));
+    LoadTexture(string(argv[6]));
     Bind(GL_TEXTURE2);
+
+    glActiveTexture(GL_TEXTURE3);
+    LoadTexture(string(argv[7]));
+    Bind(GL_TEXTURE3);
 
     cout<<"Generating of texture complete"<<endl;
 
-    initialize();
+
+    initializeQuat();
     buildView();
     buildProj();
     buildModel();
@@ -656,8 +930,7 @@ int main(int argc, const char * argv[])
     glfwSetScrollCallback(window, scrollCallback);
 
 
-
-    GLenum drawingMode = GL_FILL;
+    drawingMode = GL_FILL;
 
     // tell GL to only draw onto a pixel if the shape is closer to the viewer
     glEnable (GL_DEPTH_TEST); // enable depth-testing
@@ -667,7 +940,13 @@ int main(int argc, const char * argv[])
     /* Loop until the user closes the window */
     while (!glfwWindowShouldClose(window))
     {
-        
+         _update_fps_counter (window);
+        // Manage rotation
+        currentQuaternion = glm::slerp(currentQuaternion, orientationQuaternion_, 0.4f);
+
+        model_mat = glm::toMat4(currentQuaternion);
+        glUniformMatrix4fv(model, 1, GL_FALSE, &model_mat[0][0]);
+
         glClear (GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         
         glBindVertexArray (vao);
